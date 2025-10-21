@@ -1,59 +1,217 @@
 {
   "version": 5,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 24,
+    "patch": 0
+  },
   "configurePresets": [
     {
-      "name": "vs-debug",
-      "displayName": "Visual Studio (Debug)",
-      "generator": "Visual Studio 17 2022",
-      "binaryDir": "${sourceDir}/out/build/vs-x64-debug",
-      "architecture": "x64",
+      "name": "base",
+      "displayName": "Base Configuration",
+      "description": "Base preset with common settings",
+      "hidden": true,
+      "binaryDir": "${sourceDir}/build/${presetName}",
       "cacheVariables": {
-        "JUCE_SOURCE_DIR": "C:/JUCE/_install",
-        "BUILD_VST3": "ON",
-        "BUILD_STANDALONE": "OFF",
-        "CMAKE_PREFIX_PATH": "C:/JUCE/_install"
-      }
-    },
-    {
-      "name": "vs-release",
-      "displayName": "Visual Studio (Release)",
-      "generator": "Visual Studio 17 2022",
-      "binaryDir": "${sourceDir}/out/build/vs-x64-release",
-      "architecture": "x64",
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Release",
         "CMAKE_CXX_STANDARD": "20",
-        "JUCE_SOURCE_DIR": "C:/JUCE/_install",
         "BUILD_VST3": "ON",
-        "BUILD_STANDALONE": "OFF",
-        "CMAKE_PREFIX_PATH": "C:/JUCE/_install"
+        "BUILD_STANDALONE": "ON",
+        "JUCE_SOURCE_DIR": "${sourceDir}/JUCE"
       }
     },
     {
-      "name": "ninja-debug",
-      "displayName": "Ninja (Debug)",
-      "generator": "Ninja",
-      "binaryDir": "${sourceDir}/out/build/ninja-x64-debug",
+      "name": "windows-base",
+      "displayName": "Windows Base",
+      "description": "Base Windows configuration",
+      "hidden": true,
+      "inherits": "base",
+      "generator": "Visual Studio 17 2022",
+      "architecture": "x64",
+      "cacheVariables": {
+        "CMAKE_GENERATOR_PLATFORM": "x64"
+      }
+    },
+    {
+      "name": "windows-debug",
+      "displayName": "Windows Debug (MSVC)",
+      "description": "Debug build using Visual Studio 2022",
+      "inherits": "windows-base",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
-        "CMAKE_CXX_STANDARD": "20",
-        "JUCE_SOURCE_DIR": "C:/JUCE/_install",
-        "BUILD_VST3": "ON",
-        "BUILD_STANDALONE": "OFF",
-        "CMAKE_PREFIX_PATH": "C:/JUCE/_install"
+        "TREAT_WARNINGS_AS_ERRORS": "OFF"
+      }
+    },
+    {
+      "name": "windows-release",
+      "displayName": "Windows Release (MSVC)",
+      "description": "Optimized Release build using Visual Studio 2022 with LTO",
+      "inherits": "windows-base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "TREAT_WARNINGS_AS_ERRORS": "OFF"
+      }
+    },
+    {
+      "name": "macos-base",
+      "displayName": "macOS Base",
+      "description": "Base macOS configuration",
+      "hidden": true,
+      "inherits": "base",
+      "generator": "Ninja",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Darwin"
+      },
+      "cacheVariables": {
+        "CMAKE_OSX_DEPLOYMENT_TARGET": "10.13"
+      }
+    },
+    {
+      "name": "macos-debug",
+      "displayName": "macOS Debug (Clang)",
+      "description": "Debug build for macOS using Apple Clang with debug symbols",
+      "inherits": "macos-base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_CXX_COMPILER": "clang++",
+        "TREAT_WARNINGS_AS_ERRORS": "OFF"
+      }
+    },
+    {
+      "name": "macos-release",
+      "displayName": "macOS Release (Clang)",
+      "description": "Optimized Release build for macOS with LTO and vectorization",
+      "inherits": "macos-base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_CXX_COMPILER": "clang++",
+        "TREAT_WARNINGS_AS_ERRORS": "OFF"
+      }
+    },
+    {
+      "name": "linux-base",
+      "displayName": "Linux Base",
+      "description": "Base Linux configuration",
+      "hidden": true,
+      "inherits": "base",
+      "generator": "Ninja",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Linux"
+      }
+    },
+    {
+      "name": "linux-debug",
+      "displayName": "Linux Debug (GCC/Clang)",
+      "description": "Debug build for Linux with Address Sanitizer optional",
+      "inherits": "linux-base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_CXX_COMPILER": "g++",
+        "TREAT_WARNINGS_AS_ERRORS": "OFF",
+        "ENABLE_ASAN": "OFF"
+      }
+    },
+    {
+      "name": "linux-release",
+      "displayName": "Linux Release (GCC/Clang)",
+      "description": "Optimized Release build for Linux with LTO and march=x86-64",
+      "inherits": "linux-base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_CXX_COMPILER": "g++",
+        "TREAT_WARNINGS_AS_ERRORS": "OFF"
       }
     }
   ],
   "buildPresets": [
     {
-      "name": "vs-Rel",
-      "configurePreset": "vs-release",
-      "configuration": "Release"
+      "name": "windows-debug",
+      "configurePreset": "windows-debug",
+      "configuration": "Debug",
+      "displayName": "Windows Debug Build",
+      "description": "Build Windows Debug configuration",
+      "jobs": 0
     },
     {
-      "name": "vs-Dbg",
-      "configurePreset": "vs-debug",
-      "configuration": "Debug"
+      "name": "windows-release",
+      "configurePreset": "windows-release",
+      "configuration": "Release",
+      "displayName": "Windows Release Build",
+      "description": "Build Windows Release configuration with optimizations",
+      "jobs": 0
+    },
+    {
+      "name": "macos-debug",
+      "configurePreset": "macos-debug",
+      "configuration": "Debug",
+      "displayName": "macOS Debug Build",
+      "description": "Build macOS Debug configuration",
+      "jobs": 0
+    },
+    {
+      "name": "macos-release",
+      "configurePreset": "macos-release",
+      "configuration": "Release",
+      "displayName": "macOS Release Build",
+      "description": "Build macOS Release configuration with LTO and vectorization",
+      "jobs": 0
+    },
+    {
+      "name": "linux-debug",
+      "configurePreset": "linux-debug",
+      "configuration": "Debug",
+      "displayName": "Linux Debug Build",
+      "description": "Build Linux Debug configuration",
+      "jobs": 0
+    },
+    {
+      "name": "linux-release",
+      "configurePreset": "linux-release",
+      "configuration": "Release",
+      "displayName": "Linux Release Build",
+      "description": "Build Linux Release configuration with LTO",
+      "jobs": 0
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "windows-debug",
+      "configurePreset": "windows-debug",
+      "displayName": "Windows Debug Tests",
+      "description": "Run tests on Windows Debug build",
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "noTestsFailure": "error"
+      }
+    },
+    {
+      "name": "macos-debug",
+      "configurePreset": "macos-debug",
+      "displayName": "macOS Debug Tests",
+      "description": "Run tests on macOS Debug build",
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "noTestsFailure": "error"
+      }
+    },
+    {
+      "name": "linux-debug",
+      "configurePreset": "linux-debug",
+      "displayName": "Linux Debug Tests",
+      "description": "Run tests on Linux Debug build",
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "noTestsFailure": "error"
+      }
     }
   ]
 }

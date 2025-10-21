@@ -1,305 +1,200 @@
-# DeepSeek-OCR Quick Start (WSL2 Ubuntu)
+# Engine:Field v1.0 — Quick Start Guide
 
-## Status: PyTorch Installing 🔄
+Get Engine:Field built and tested in under 5 minutes.
 
-PyTorch + CUDA libraries are downloading in background. ETA: ~10-15 minutes.
+## Prerequisites
 
-**To monitor progress:**
+- **JUCE 8.0.10+** — [Download from juce.com](https://juce.com/discover/downloads)
+- **CMake 3.24+** — [cmake.org](https://cmake.org/download/)
+- **C++ 20 Compiler:**
+  - Windows: Visual Studio 2022 Community (free)
+  - macOS: Xcode 14+ (via `xcode-select --install`)
+  - Linux: GCC 11+ or Clang 14+
+
+## Step 1: Obtain JUCE
+
+### Windows
 ```bash
-wsl -d Ubuntu bash -c "ps aux | grep pip"
+# Download JUCE 8.0.10 or later (e.g., JUCE-8.0.10.zip)
+# Extract to a known location, e.g.:
+mkdir C:\JUCE
+# Extract the JUCE archive to C:\JUCE
 ```
 
----
-
-## Once PyTorch Finishes ✅
-
-### Step 1: Activate Environment
-
+### macOS
 ```bash
-wsl -d Ubuntu bash -c "
-cd ~/deepseek-ocr-workspace
-source venv/bin/activate
-echo 'Environment activated!'
-"
+# Use Homebrew (optional)
+brew install juce
+# OR download manually from juce.com and extract to ~/JUCE
 ```
 
-### Step 2: Install Dependencies
-
+### Linux
 ```bash
-wsl -d Ubuntu bash -c "
-cd ~/deepseek-ocr-workspace
-source venv/bin/activate
-pip install transformers pillow requests tqdm fastapi uvicorn
-echo 'Dependencies installed!'
-"
+# Fedora/RHEL
+sudo dnf install juce-devel
+
+# Ubuntu/Debian
+sudo apt-get install libjuce-dev
+
+# OR download JUCE source and extract to ~/JUCE
 ```
 
-### Step 3: Test GPU Connectivity
-
-```bash
-wsl -d Ubuntu bash -c "
-cd ~/deepseek-ocr-workspace
-source venv/bin/activate
-python3 << 'EOF'
-import torch
-print(f'PyTorch version: {torch.__version__}')
-print(f'CUDA available: {torch.cuda.is_available()}')
-if torch.cuda.is_available():
-    print(f'GPU: {torch.cuda.get_device_name(0)}')
-    print(f'Memory: {torch.cuda.get_device_properties(0).total_memory / 1e9:.1f}GB')
-EOF
-"
-```
-
-Expected output:
-```
-PyTorch version: 2.7.1+cu118
-CUDA available: True
-GPU: NVIDIA GeForce RTX 4060
-Memory: 8.0GB
-```
-
-### Step 4: Clone DeepSeek-OCR Repository
+## Step 2: Clone & Enter Directory
 
 ```bash
-wsl -d Ubuntu bash -c "
-cd ~/deepseek-ocr-workspace
-git clone https://github.com/deepseek-ai/DeepSeek-OCR.git
-cd DeepSeek-OCR
-echo 'Repository cloned!'
-"
+cd /path/to/plugin_dev
 ```
 
-### Step 5: First Inference (Download Model)
-
-The first run will download the 7GB model from HuggingFace.
-
+Verify the directory structure:
 ```bash
-wsl -d Ubuntu bash -c "
-cd ~/deepseek-ocr-workspace
-source venv/bin/activate
-python3 /mnt/c/plugin_dev/deepseek_ocr_test.py
-"
+ls -la
+# Should show: README.md, QUICKSTART.md, CMakeLists.txt, plugins/, scripts/
 ```
 
-This will:
-1. Download DeepSeek-OCR model (~7GB)
-2. Load on GPU
-3. Run test extraction (if you provide test_image.jpg)
+## Step 3: Configure & Build
 
----
-
-## Quick Test on Your Own Image
-
-### Option A: From Windows
-
-Copy your test image to:
-```
-C:\plugin_dev\test_image.jpg
-```
-
-Then run:
+### Windows (MSVC)
 ```bash
-wsl -d Ubuntu bash -c "
-cd ~/deepseek-ocr-workspace
-source venv/bin/activate
-python3 << 'EOF'
-from PIL import Image
-from transformers import AutoModel, AutoTokenizer
-import torch
+cmake -S . -B build -G "Visual Studio 17 2022" ^
+  -DJUCE_SOURCE_DIR="C:\JUCE" ^
+  -DBUILD_VST3=ON -DBUILD_STANDALONE=ON ^
+  -DCMAKE_BUILD_TYPE=Release
 
-# Load model
-print('Loading model...')
-model = AutoModel.from_pretrained("deepseek-ai/DeepSeek-OCR", trust_remote_code=True, torch_dtype=torch.bfloat16)
-tokenizer = AutoTokenizer.from_pretrained("deepseek-ai/DeepSeek-OCR", trust_remote_code=True)
-
-# Load image from Windows
-image = Image.open("/mnt/c/plugin_dev/test_image.jpg")
-print(f'Image: {image.size}')
-
-# Extract
-prompt = "Extract all text from this image"
-messages = [{"role": "user", "content": [{"type": "image", "image": image}, {"type": "text", "text": prompt}]}]
-inputs = tokenizer(messages, return_tensors="pt")
-outputs = model.generate(**inputs, max_new_tokens=512)
-result = tokenizer.decode(outputs[0], skip_special_tokens=True)
-print(f'Result:\n{result}')
-EOF
-"
+cmake --build build --config Release
 ```
 
-### Option B: Run FastAPI Backend
-
-Start the inference server:
-
+### macOS
 ```bash
-wsl -d Ubuntu bash -c "
-cd ~/deepseek-ocr-workspace
-source venv/bin/activate
-uvicorn /mnt/c/plugin_dev/deepseek_backend:app --reload --host 0.0.0.0 --port 8000
-"
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release \
+  -DJUCE_SOURCE_DIR=~/JUCE \
+  -DBUILD_VST3=ON -DBUILD_STANDALONE=ON
+
+cmake --build build --config Release
 ```
 
-Then use from Windows:
-
+### Linux
 ```bash
-# Upload image and extract
-curl -X POST http://localhost:8000/extract \
-  -F "file=@C:\plugin_dev\test_image.jpg" \
-  -F "prompt=Extract all text"
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release \
+  -DJUCE_SOURCE_DIR=~/JUCE \
+  -DBUILD_VST3=ON -DBUILD_STANDALONE=ON
+
+cmake --build build --config Release
 ```
 
-Visit `http://localhost:8000/docs` for interactive API documentation.
-
----
-
-## For Your Business Ideas
-
-### 1. Construction Quote Generator
-
-**Test extraction:**
-```python
-prompt = """Analyze this bathroom renovation photo. Extract:
-- Room type
-- Fixtures (toilets, sinks, showers, tiles, lights)
-- Count of each
-Return as JSON."""
+**Expected output:**
+```
+[  0%] Building CXX object ...
+...
+[100%] Built target EngineField_VST3
+[100%] Built target EngineField_Standalone
 ```
 
-**API endpoint:**
+Build time: ~30–60 seconds (first-time Ninja/Makefile builds may take 1–2 minutes).
+
+## Step 4: Locate Built Artifacts
+
+### VST3 Plugin
+- **Windows:** `build\plugins\EngineField\EngineField_artefacts\Release\VST3\EngineField.vst3`
+- **macOS:** `build/plugins/EngineField/EngineField_artefacts/Release/VST3/EngineField.vst3`
+- **Linux:** `build/plugins/EngineField/EngineField_artefacts/Release/VST3/EngineField.vst3`
+
+### Standalone App
+- **Windows:** `build\plugins\EngineField\EngineField_artefacts\Release\Standalone\EngineField.exe`
+- **macOS:** `build/plugins/EngineField/EngineField_artefacts/Release/Standalone/EngineField.app`
+- **Linux:** `build/plugins/EngineField/EngineField_artefacts/Release/Standalone/EngineField`
+
+## Step 5: Test the Standalone
+
+### Windows
 ```bash
-curl -X POST http://localhost:8000/extract-quote \
-  -F "file=@bathroom.jpg"
+.\build\plugins\EngineField\EngineField_artefacts\Release\Standalone\EngineField.exe
 ```
 
-### 2. Defect/Snag List
-
-**Test extraction:**
-```python
-prompt = """Analyze this construction defect photo. Extract:
-- Location
-- Defect type
-- Severity (1-5)
-- Responsible trade
-Return as JSON."""
-```
-
-**API endpoint:**
+### macOS
 ```bash
-curl -X POST http://localhost:8000/extract-defect \
-  -F "file=@defect.jpg"
+open build/plugins/EngineField/EngineField_artefacts/Release/Standalone/EngineField.app
 ```
 
-### 3. PropSignal (Government Valuation)
-
-**Test extraction:**
-```python
-prompt = """Extract property valuation data:
-- Address
-- Capital improved value
-- Land value
-- Valuation date
-Return as JSON."""
+### Linux
+```bash
+./build/plugins/EngineField/EngineField_artefacts/Release/Standalone/EngineField
 ```
 
----
+**You should see:**
+- A window with warm cream/brown background (600×550 px)
+- 4×4 sampler pad grid in the center
+- CHARACTER slider on the left
+- MIX knob on the right
+- EFFECT button at the bottom
 
-## Next Phase: Send Discovery Messages
+## Step 6: Install VST3 Plugin (Optional)
 
-Once you have extraction working:
-
-1. **Send messages from `C:\plugin_dev\New folder\discovery_messages.md`**
-2. **Ask people to send 2-3 photos of their problem**
-3. **Test DeepSeek-OCR on real photos**
-4. **Measure accuracy + speed**
-5. **Build MVP web app** (2-3 days)
-
----
-
-## MVP Web App Stack
-
-- **Frontend:** Next.js 14 + React (Next.js App Router)
-- **Backend:** FastAPI + DeepSeek-OCR (already have `deepseek_backend.py`)
-- **Database:** Supabase PostgreSQL (free tier available)
-- **Storage:** Supabase Storage (5GB free)
-- **Auth:** Supabase Auth (email magic link)
-- **Payments:** Stripe (when you start charging)
-
-**Timeline:** 2-3 days to build MVP
-
----
-
-## Files You Have
-
-✅ `C:\plugin_dev\deepseek_ocr_test.py` - Test script
-✅ `C:\plugin_dev\deepseek_backend.py` - FastAPI backend
-✅ `C:\plugin_dev\setup_deepseek.sh` - Setup automation
-✅ `C:\plugin_dev\DEEPSEEK_SETUP_GUIDE.md` - Detailed guide
-✅ `C:\plugin_dev\New folder\discovery_messages.md` - Discovery templates
-✅ `C:\plugin_dev\New folder\interview_guide.md` - Interview framework
-
----
+See **INSTALL.md** for VST3 installation in your DAW.
 
 ## Troubleshooting
 
-### "CUDA out of memory"
-```python
-# Reduce max_tokens
-outputs = model.generate(**inputs, max_new_tokens=256)  # was 1024
-```
-
-### "Model download too slow"
-- WSL2 internet can be slower. Be patient or run in native Ubuntu VM.
-
-### "First inference is slow"
-- Normal (60+ seconds on first run). Subsequent runs: 5-10 seconds.
-
-### "AttributeError: module 'transformers' has no attribute..."
+### CMake not found
 ```bash
-pip install --upgrade transformers
+# Windows: Install Visual Studio Build Tools with CMake component
+# macOS: brew install cmake
+# Linux: sudo apt-get install cmake
 ```
 
----
-
-## Quick Reference: Commands
-
+### JUCE not found
 ```bash
-# Activate environment
-wsl -d Ubuntu bash -c "cd ~/deepseek-ocr-workspace && source venv/bin/activate && bash"
-
-# Run test
-python3 /mnt/c/plugin_dev/deepseek_ocr_test.py
-
-# Start API
-uvicorn /mnt/c/plugin_dev/deepseek_backend:app --host 0.0.0.0 --port 8000
-
-# Check GPU
-python3 -c "import torch; print(f'CUDA: {torch.cuda.is_available()}')"
-
-# Test on specific image
-python3 << 'EOF'
-from transformers import AutoModel, AutoTokenizer
-from PIL import Image
-import torch
-model = AutoModel.from_pretrained("deepseek-ai/DeepSeek-OCR", trust_remote_code=True, torch_dtype=torch.bfloat16)
-tokenizer = AutoTokenizer.from_pretrained("deepseek-ai/DeepSeek-OCR", trust_remote_code=True)
-image = Image.open("/path/to/image.jpg")
-messages = [{"role": "user", "content": [{"type": "image", "image": image}, {"type": "text", "text": "Extract all text"}]}]
-inputs = tokenizer(messages, return_tensors="pt")
-outputs = model.generate(**inputs, max_new_tokens=512)
-print(tokenizer.decode(outputs[0], skip_special_tokens=True))
-EOF
+# Verify JUCE_SOURCE_DIR path is correct and contains juce_appconfig.h
+ls <JUCE_SOURCE_DIR>/modules/juce_core/juce_core.h
 ```
 
----
+### Compiler error (C++ 20 not available)
+```bash
+# Update compiler:
+# Windows: Install Visual Studio 2022
+# macOS: xcode-select --install && sudo xcode-select --switch /Applications/Xcode.app/Contents/Developer
+# Linux: sudo apt-get install g++-11 && export CXX=g++-11
+```
+
+### Build fails with "permission denied"
+```bash
+# On Linux/macOS, ensure write permission:
+chmod -R u+w .
+```
 
 ## Next Steps
 
-1. ⏳ Wait for PyTorch to finish (~5-10 min)
-2. ✅ Run Step 1-5 above
-3. 📸 Gather test images (send discovery messages)
-4. 🧪 Test extraction on real photos
-5. 🚀 Build MVP web app
-6. 💰 Start validation with paying customers
+1. **Load in DAW:** Copy VST3 plugin to your DAW's VST3 folder and rescan
+2. **Tweak Parameters:** Use CHARACTER (0–100%) and MIX (0–100%) to morph transients
+3. **Test with Drums:** Load a drum loop and hear the Z-plane filtering in action
+4. **Read README.md:** Full feature set and technical details
 
-**You got this! 🎉**
+## Quick Parameter Tuning
+
+- **CHARACTER 0–50%:** Subtle morphing with fewer decay steps (good for preserving attack)
+- **CHARACTER 50–100%:** Aggressive morphing with many decay steps (good for shaping decay tails)
+- **MIX 0–50%:** Blended dry/wet (preserves original tone + effect)
+- **MIX 50–100%:** More filtered signal (stronger effect character)
+- **EFFECT button ON:** Hear only the wet signal; useful for dialing in CHARACTER without dry interference
+
+## Build Variants
+
+### Development Build (faster iteration, warnings allowed)
+```bash
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug \
+  -DJUCE_SOURCE_DIR=~/JUCE
+cmake --build build --config Debug
+```
+
+### Strict CI Build (warnings → errors)
+```bash
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release \
+  -DENABLE_WARNINGS_AS_ERRORS=ON \
+  -DJUCE_SOURCE_DIR=~/JUCE
+cmake --build build --config Release
+```
+
+## Support
+
+- See **README.md** for full documentation
+- See **INSTALL.md** for platform-specific VST3 setup
+- See **CLAUDE.md** for developer reference and DSP architecture
+- Questions? Contact support@engineaudio.com

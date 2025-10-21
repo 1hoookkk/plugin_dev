@@ -1,6 +1,7 @@
-# Build directories
+# Build directories (CMake presets output)
 build/
 Build/
+out/
 cmake-build-*/
 
 # CMake cache and generated files

@@ -1,0 +1,278 @@
+name: Multi-Platform Build & Validation
+
+on:
+  push:
+    branches: [master, main, develop]
+  pull_request:
+    branches: [master, main, develop]
+  workflow_dispatch:
+    inputs:
+      strictness_level:
+        description: 'pluginval strictness level (1-10)'
+        required: false
+        default: '5'
+
+env:
+  JUCE_VERSION: '8.0.10'
+  PLUGINVAL_VERSION: '1.0.39'
+
+jobs:
+  build-windows:
+    name: Build Windows (MSVC ${{ matrix.build-type }})
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        build-type: [Debug, Release]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup JUCE
+        run: |
+          mkdir -p C:\JUCE
+          curl -L -o juce.zip https://github.com/juce-framework/JUCE/releases/download/${{ env.JUCE_VERSION }}/JUCE-${{ env.JUCE_VERSION }}-Windows.zip
+          7z x juce.zip -oC:\JUCE
+          echo "JUCE_SOURCE_DIR=C:\JUCE\JUCE-${{ env.JUCE_VERSION }}" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Setup CMake & Ninja
+        uses: cmake-js/setup-cmake@v3
+        with:
+          cmake-version: '3.27.x'
+
+      - name: Install Ninja
+        uses: seanmiddleditch/gha-setup-ninja@master
+        with:
+          version: '1.11.1'
+
+      - name: Configure (Visual Studio)
+        run: |
+          cmake --preset windows-${{ matrix.build-type == 'Debug' && 'debug' || 'release' }} `
+            -DJUCE_SOURCE_DIR="${{ env.JUCE_SOURCE_DIR }}" `
+            -DBUILD_VST3=ON `
+            -DBUILD_STANDALONE=ON `
+            -DTREAT_WARNINGS_AS_ERRORS=OFF
+
+      - name: Build
+        run: |
+          cmake --build --preset windows-${{ matrix.build-type == 'Debug' && 'debug' || 'release' }} `
+            --config ${{ matrix.build-type }} `
+            --parallel 4
+
+      - name: List artifacts
+        run: |
+          Get-ChildItem -Recurse build/ -Include "*.vst3" -ErrorAction SilentlyContinue | ForEach-Object { Write-Host $_.FullName }
+
+      - name: Download pluginval
+        run: |
+          mkdir -p C:\pluginval
+          curl -L -o pluginval.zip https://github.com/Tracktion/pluginval/releases/download/v${{ env.PLUGINVAL_VERSION }}/pluginval_Windows.zip
+          7z x pluginval.zip -oC:\pluginval
+          echo "C:\pluginval" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Validate VST3 Plugin
+        continue-on-error: false
+        run: |
+          $vst3_path = Get-ChildItem -Recurse build/ -Include "EngineField.vst3" -ErrorAction SilentlyContinue | Select-Object -First 1
+          if ($vst3_path) {
+            Write-Host "Found VST3: $($vst3_path.FullName)"
+            pluginval.exe --strictness-level 5 --validate "$($vst3_path.FullName)" --timeout-ms 120000
+          } else {
+            Write-Host "ERROR: VST3 plugin not found"
+            exit 1
+          }
+
+      - name: Upload build artifacts
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: windows-${{ matrix.build-type }}-artifacts
+          path: |
+            build/**/EngineField.vst3/
+            build/**/EngineField.exe
+
+  build-macos:
+    name: Build macOS (Clang ${{ matrix.build-type }})
+    runs-on: macos-13
+    strategy:
+      fail-fast: false
+      matrix:
+        build-type: [Debug, Release]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup JUCE
+        run: |
+          mkdir -p ~/JUCE
+          curl -L -o juce.tar.gz https://github.com/juce-framework/JUCE/releases/download/${{ env.JUCE_VERSION }}/JUCE-${{ env.JUCE_VERSION }}-macOS.tar.gz
+          tar -xzf juce.tar.gz -C ~/JUCE
+          echo "JUCE_SOURCE_DIR=~/JUCE/JUCE-${{ env.JUCE_VERSION }}" >> $GITHUB_ENV
+
+      - name: Setup CMake & Ninja
+        uses: cmake-js/setup-cmake@v3
+        with:
+          cmake-version: '3.27.x'
+
+      - name: Install Ninja
+        run: brew install ninja
+
+      - name: Configure (Ninja)
+        run: |
+          cmake --preset macos-${{ matrix.build-type == 'Debug' && 'debug' || 'release' }} \
+            -DJUCE_SOURCE_DIR=${{ env.JUCE_SOURCE_DIR }} \
+            -DBUILD_VST3=ON \
+            -DBUILD_STANDALONE=ON \
+            -DTREAT_WARNINGS_AS_ERRORS=OFF
+
+      - name: Build
+        run: |
+          cmake --build --preset macos-${{ matrix.build-type == 'Debug' && 'debug' || 'release' }} \
+            --parallel $(sysctl -n hw.ncpu)
+
+      - name: List artifacts
+        run: |
+          find build/ -name "EngineField.vst3" -o -name "EngineField" -type d 2>/dev/null
+
+      - name: Download pluginval
+        run: |
+          mkdir -p ~/pluginval
+          curl -L -o pluginval.dmg https://github.com/Tracktion/pluginval/releases/download/v${{ env.PLUGINVAL_VERSION }}/pluginval_macOS.dmg
+          hdiutil attach pluginval.dmg
+          cp /Volumes/pluginval/pluginval.app/Contents/MacOS/pluginval ~/pluginval/
+          hdiutil detach /Volumes/pluginval
+          echo "$HOME/pluginval" >> $GITHUB_PATH
+
+      - name: Validate VST3 Plugin
+        continue-on-error: false
+        run: |
+          vst3_path=$(find build/ -name "EngineField.vst3" -type d 2>/dev/null | head -1)
+          if [ -n "$vst3_path" ]; then
+            echo "Found VST3: $vst3_path"
+            ~/pluginval/pluginval --strictness-level 5 --validate "$vst3_path" --timeout-ms 120000
+          else
+            echo "ERROR: VST3 plugin not found"
+            exit 1
+          fi
+
+      - name: Upload build artifacts
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: macos-${{ matrix.build-type }}-artifacts
+          path: |
+            build/**/EngineField.vst3/
+            build/*/EngineField.app/
+
+  build-linux:
+    name: Build Linux (GCC ${{ matrix.build-type }})
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        build-type: [Debug, Release]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            cmake \
+            ninja-build \
+            libx11-dev \
+            libxrandr-dev \
+            libxinerama-dev \
+            libxcursor-dev \
+            libxi-dev \
+            libgl1-mesa-dev \
+            libfreetype6-dev \
+            libfontconfig1-dev \
+            libasound2-dev \
+            libdbus-1-dev \
+            libglib2.0-dev
+
+      - name: Setup JUCE
+        run: |
+          mkdir -p ~/JUCE
+          curl -L -o juce.tar.gz https://github.com/juce-framework/JUCE/releases/download/${{ env.JUCE_VERSION }}/JUCE-${{ env.JUCE_VERSION }}-Linux.tar.gz
+          tar -xzf juce.tar.gz -C ~/JUCE
+          echo "JUCE_SOURCE_DIR=~/JUCE/JUCE-${{ env.JUCE_VERSION }}" >> $GITHUB_ENV
+
+      - name: Configure (Ninja)
+        run: |
+          cmake --preset linux-${{ matrix.build-type == 'Debug' && 'debug' || 'release' }} \
+            -DJUCE_SOURCE_DIR=${{ env.JUCE_SOURCE_DIR }} \
+            -DBUILD_VST3=ON \
+            -DBUILD_STANDALONE=ON \
+            -DTREAT_WARNINGS_AS_ERRORS=OFF
+
+      - name: Build
+        run: |
+          cmake --build --preset linux-${{ matrix.build-type == 'Debug' && 'debug' || 'release' }} \
+            --parallel $(nproc)
+
+      - name: List artifacts
+        run: |
+          find build/ -name "EngineField.vst3" -o -name "EngineField" -type d 2>/dev/null
+
+      - name: Download & build pluginval
+        run: |
+          git clone https://github.com/Tracktion/pluginval.git ~/pluginval_src
+          cd ~/pluginval_src
+          git checkout tags/v${{ env.PLUGINVAL_VERSION }}
+          mkdir build && cd build
+          cmake .. -DCMAKE_BUILD_TYPE=Release
+          cmake --build . --parallel $(nproc)
+          echo "$HOME/pluginval_src/build" >> $GITHUB_PATH
+
+      - name: Validate VST3 Plugin
+        continue-on-error: false
+        run: |
+          vst3_path=$(find build/ -name "EngineField.vst3" -type d 2>/dev/null | head -1)
+          if [ -n "$vst3_path" ]; then
+            echo "Found VST3: $vst3_path"
+            ~/pluginval_src/build/pluginval --strictness-level 5 --validate "$vst3_path" --timeout-ms 120000
+          else
+            echo "ERROR: VST3 plugin not found"
+            exit 1
+          fi
+
+      - name: Upload build artifacts
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: linux-${{ matrix.build-type }}-artifacts
+          path: |
+            build/**/EngineField.vst3/
+            build/*/EngineField
+
+  summary:
+    name: Build Summary
+    if: always()
+    runs-on: ubuntu-latest
+    needs: [build-windows, build-macos, build-linux]
+
+    steps:
+      - name: Check build status
+        run: |
+          if [ "${{ needs.build-windows.result }}" == "failure" ] || \
+             [ "${{ needs.build-macos.result }}" == "failure" ] || \
+             [ "${{ needs.build-linux.result }}" == "failure" ]; then
+            echo "One or more builds failed"
+            exit 1
+          fi
+          echo "All builds completed successfully!"
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v3
+
+      - name: List all artifacts
+        run: |
+          echo "Build artifacts:"
+          find . -type f -name "*.vst3" -o -name "*.exe" -o -name "*.app" | head -20
