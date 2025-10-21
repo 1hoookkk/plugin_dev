@@ -26,13 +26,13 @@ juce_add_plugin(${TARGET_NAME}
     COMPANY_WEBSITE "https://engineaudio.com"
     COMPANY_EMAIL "support@engineaudio.com"
     BUNDLE_ID ${BUNDLE_ID}
-    
+
     # Plugin characteristics
     IS_SYNTH FALSE
     NEEDS_MIDI_INPUT FALSE
     NEEDS_MIDI_OUTPUT FALSE
     IS_MIDI_EFFECT FALSE
-    
+
     # Build settings
     COPY_PLUGIN_AFTER_BUILD ${FIELD_INSTALL_AFTER_BUILD}
     PLUGIN_MANUFACTURER_CODE EngA
@@ -87,19 +87,29 @@ target_link_libraries(${TARGET_NAME}
         juce::juce_dsp
 )
 
-# Warning configuration
+# Warning configuration: gate -Werror behind optional flag
+option(ENABLE_WARNINGS_AS_ERRORS "Treat compiler warnings as errors" OFF)
+
 if(MSVC)
-    target_compile_options(${TARGET_NAME} 
-        PRIVATE 
-            /WX     # Warnings as errors
-            /wd4458 # Suppress declaration hides class member
-    )
+    if(ENABLE_WARNINGS_AS_ERRORS)
+        target_compile_options(${TARGET_NAME}
+            PRIVATE
+                /WX     # Warnings as errors
+                /wd4458 # Suppress declaration hides class member
+        )
+    else()
+        target_compile_options(${TARGET_NAME} PRIVATE /wd4458)
+    endif()
 else()
-    target_compile_options(${TARGET_NAME} 
-        PRIVATE 
-            -Werror # Warnings as errors
-            -Wno-deprecated-declarations
-    )
+    if(ENABLE_WARNINGS_AS_ERRORS)
+        target_compile_options(${TARGET_NAME}
+            PRIVATE
+                -Werror # Warnings as errors
+                -Wno-deprecated-declarations
+        )
+    else()
+        target_compile_options(${TARGET_NAME} PRIVATE -Wno-deprecated-declarations)
+    endif()
 endif()
 
 # IDE source groups for better organization

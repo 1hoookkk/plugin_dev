@@ -57,8 +57,7 @@ void FieldProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
     const bool currentBypass = bypassParam_->load() > 0.5f;
     bypassSmooth_.setCurrentAndTargetValue(currentBypass ? 0.0f : 1.0f);
 
-    uiWaveformFifo_.reset();
-    std::fill(uiWaveformRingBuffer_.begin(), uiWaveformRingBuffer_.end(), 0.0f);
+    uiWaveformFifo_.reset(); uiWaveformRingBuffer_.assign(kWaveformDepth, 0.0f);
 }
 
 void FieldProcessor::releaseResources()
@@ -72,41 +71,7 @@ bool FieldProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const
     return in == juce::AudioChannelSet::stereo() && out == juce::AudioChannelSet::stereo();
 }
 
-void FieldProcessor::pushToVisualiser(const juce::AudioBuffer<float>& buffer) noexcept
-{
-    const int num = buffer.getNumSamples();
-    const float* L = buffer.getReadPointer(0);
-    // Downmix to mono & push
-    int start1, size1, start2, size2;
-    visFifo_.prepareToWrite(num, start1, size1, start2, size2);
-    if (size1 + size2 > 0)
-    {
-        if (size1 > 0) {
-            auto* dst = visBuffer_.getWritePointer(0, start1);
-            for (int i = 0; i < size1; ++i) dst[i] = L[i];
-        }
-        if (size2 > 0) {
-            auto* dst = visBuffer_.getWritePointer(0, start2);
-            for (int i = 0; i < size2; ++i) dst[i] = L[size1 + i];
-        }
-        visFifo_.finishedWrite(size1 + size2);
-    }
-}
 
-bool FieldProcessor::popVisualiserBlock(juce::AudioBuffer<float>& dest) noexcept
-{
-    const int want = dest.getNumSamples();
-    int start1, size1, start2, size2;
-    visFifo_.prepareToRead(want, start1, size1, start2, size2);
-    if (size1 + size2 > 0)
-    {
-        if (size1 > 0) dest.copyFrom(0, 0, visBuffer_, 0, start1, size1);
-        if (size2 > 0) dest.copyFrom(0, size1, visBuffer_, 0, start2, size2);
-        visFifo_.finishedRead(size1 + size2);
-        return true;
-    }
-    return false;
-}
 
 void FieldProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi)
 {
@@ -167,7 +132,7 @@ void FieldProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiB
         zf_.setMix(effectiveMix);
 
     // Update coefficients once per block (expensive)
-    zf_.updateCoeffsBlock();
+    zf_.updateCoeffsBlock(numSamples);
 
     // Copy pole data to UI atomics (lock-free, cheap)
     const auto& poles = zf_.getLastPoles();
@@ -252,7 +217,6 @@ void FieldProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiB
         if (wrote > 0) uiWaveformFifo_.finishedWrite(wrote);
     }
 
-    pushToVisualiser(buffer);
 }
 
 juce::AudioProcessorEditor* FieldProcessor::createEditor() { return new engine::ui::FieldWaveformEditor(*this, apvts_); }
@@ -294,5 +258,6 @@ int FieldProcessor::getWaveformSamples(float* destBuffer, int maxSamples) noexce
     uiWaveformFifo_.finishedRead(size1 + size2);
     return (size1 + size2);
 }
+
 
 

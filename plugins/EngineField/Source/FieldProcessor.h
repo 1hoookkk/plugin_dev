@@ -66,8 +66,6 @@ public:
     }
 
     // Visualiser FIFO (single-producer: audio thread, single-consumer: GUI)
-    void pushToVisualiser(const juce::AudioBuffer<float>& buffer) noexcept;
-    bool popVisualiserBlock(juce::AudioBuffer<float>& dest) noexcept;
 
     // UI access (RT-safe)
     static constexpr int kWaveformDepth = 512; // tuneable
@@ -105,8 +103,6 @@ private:
     juce::AudioBuffer<float> dryBuffer_;
 
     // Visualiser ring buffer (mono)
-    juce::AbstractFifo visFifo_{ 1 << 15 }; // 32768 samples
-    juce::AudioBuffer<float> visBuffer_{1, 1 << 15};
 
     // UI pole data (6 poles × 2 values = 12 floats: r0,theta0, r1,theta1, ...)
     std::array<std::atomic<float>, 12> uiPoles_{};
@@ -127,7 +123,7 @@ private:
 
     // Lock-free SPSC for waveform peaks (producer: audio thread, consumer: UI thread)
     juce::AbstractFifo uiWaveformFifo_{ kWaveformDepth };
-    std::vector<float> uiWaveformRingBuffer_{ kWaveformDepth };
+    std::vector<float> uiWaveformRingBuffer_{};
 
     // level envelope state (audio thread) and atomic snapshot for UI
     float uiEnvelopeState_ = 0.0f;
@@ -137,5 +133,6 @@ private:
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(FieldProcessor)
 };
+
 
 

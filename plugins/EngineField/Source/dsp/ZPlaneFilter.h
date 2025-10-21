@@ -192,12 +192,12 @@ namespace emu
         void reset() { cascadeL.reset(); cascadeR.reset(); morphSmooth.setCurrentAndTargetValue(0.5f); }
 
         // Update coefficients once per block
-        void updateCoeffsBlock()
+        void updateCoeffsBlock(int samplesPerBlock)
         {
             // Advance smoothers by block size for per-sample effective stepping
             // (Note: these are only read once per block, but skip() ensures proper settling time)
-            morphSmooth.skip(1);
-            intensitySmooth.skip(1);
+            morphSmooth.skip(samplesPerBlock);
+            intensitySmooth.skip(samplesPerBlock);
 
             lastMorph     = morphSmooth.getCurrentValue();
             lastIntensity = intensitySmooth.getCurrentValue();
