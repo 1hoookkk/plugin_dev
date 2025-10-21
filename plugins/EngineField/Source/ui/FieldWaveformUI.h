@@ -13,13 +13,11 @@ namespace engine::ui
 {
     namespace RetroPalette
     {
-        inline const juce::Colour kBackground         { 0xFF2D6DA9 };
-        inline const juce::Colour kViewportBackground { 0xFF050505 };
-        inline const juce::Colour kViewportFrame      { 0xFFCED9E8 };
-        inline const juce::Colour kBaseline           { 0xFF59B850 };
-        inline const juce::Colour kBarFill            { 0xFFE8D348 };
-        inline const juce::Colour kPeakTracer         { 0xFFC3FF00 };
-        inline const juce::Colour kMeterDim           { 0xFF153454 };
+        inline const juce::Colour kBackground { 0xFF2D6DA9 };
+        inline const juce::Colour kViewportBackground { 0xFF000000 };
+        inline const juce::Colour kBaseline { 0xFF59B850 };
+        inline const juce::Colour kBarFill { 0xFFE8D348 };
+        inline const juce::Colour kPeakTracer { 0xFFC3FF00 };
     }
 
     class FieldWaveformEditor final : public juce::AudioProcessorEditor,
@@ -34,36 +32,25 @@ namespace engine::ui
         void resized() override;
 
     private:
-        using SliderAttachment = juce::AudioProcessorValueTreeState::SliderAttachment;
-        using ButtonAttachment = juce::AudioProcessorValueTreeState::ButtonAttachment;
-
         void timerCallback() override;
-        void drawViewport(juce::Graphics& g, juce::Rectangle<int> bounds);
-        void drawWaveform(juce::Graphics& g, juce::Rectangle<float> area) const;
-        void drawPeakTracer(juce::Graphics& g, juce::Rectangle<float> area) const;
-        void drawLevelMarker(juce::Graphics& g, juce::Rectangle<float> area) const;
+        void drawWaveform(juce::Graphics& g, juce::Rectangle<int> viewport, float alpha, float character) const;
+        void drawPeakTracer(juce::Graphics& g, juce::Rectangle<int> viewport, float alpha) const;
+        void drawAlivePulse(juce::Graphics& g, juce::Rectangle<int> viewport) const;
 
         FieldProcessor& processorRef_;
-                FieldLookAndFeel lookAndFeel_;
 
-        juce::Slider mixSlider_;
-        juce::Slider characterSlider_;
-        juce::TextButton effectButton_;
-        juce::Label mixLabel_;
-        juce::Label characterLabel_;
+        std::atomic<float>* mixParam_ { nullptr };
+        std::atomic<float>* characterParam_ { nullptr };
+        std::atomic<float>* effectParam_ { nullptr };
 
-        std::unique_ptr<SliderAttachment> mixAttachment_;
-        std::unique_ptr<SliderAttachment> characterAttachment_;
-        std::unique_ptr<ButtonAttachment> effectAttachment_;
+        std::unique_ptr<juce::Drawable> skinOff_;
+        std::unique_ptr<juce::Drawable> skinOn_;
 
-                std::array<float, engine::viz::kWaveformBarCount> waveformPeaks_{};
+        const juce::Rectangle<int> viewportPx_ { 16, 80, 388, 348 };
+
+        std::array<float, engine::viz::kWaveformBarCount> waveformPeaks_ {};
         float currentLevel_ = 0.0f;
-
-        juce::Rectangle<int> viewportBounds_;
 
         JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(FieldWaveformEditor)
     };
 } // namespace engine::ui
-
-
-

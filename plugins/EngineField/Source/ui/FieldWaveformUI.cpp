@@ -2,16 +2,17 @@
 
 #include "../FieldProcessor.h"
 #include "../parameters.h"
+#include "BinaryData.h"
 
 namespace engine::ui
 {
     namespace
     {
-        constexpr int kTimerHz = 30;
-        constexpr int kBarWidth = 6;
-        constexpr int kBarGap = 2;
-        constexpr int kViewportPadding = 24;
-        constexpr int kViewportFrameThickness = 8;
+        constexpr int kTimerHz = 60;
+        constexpr int kBarWidthPx = 6;
+        constexpr int kBarGapPx = 2;
+        constexpr float kDripBase = 0.2f;
+        constexpr float kDripRange = 0.8f;
 
         inline float clamp01(float value) noexcept
         {
@@ -24,202 +25,133 @@ namespace engine::ui
         : juce::AudioProcessorEditor(&processor), processorRef_(processor)
     {
         setOpaque(true);
-        setLookAndFeel(&lookAndFeel_);
-        setSize(704, 980);
+        setSize(420, 560);
 
-        mixLabel_.setText("MIX", juce::dontSendNotification);
-        mixLabel_.setJustificationType(juce::Justification::centredLeft);
-        mixLabel_.setColour(juce::Label::textColourId, RetroPalette::kViewportFrame);
-        mixLabel_.setFont(juce::FontOptions(26.0f, juce::Font::bold));
-        addAndMakeVisible(mixLabel_);
+        skinOff_ = juce::Drawable::createFromImageData(BinaryData::_1_svg, BinaryData::_1_svgSize);
+        skinOn_  = juce::Drawable::createFromImageData(BinaryData::_2_svg, BinaryData::_2_svgSize);
 
-        mixSlider_.setName("MIX");
-        mixSlider_.setSliderStyle(juce::Slider::LinearHorizontal);
-        mixSlider_.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
-        mixSlider_.setRange(0.0, 100.0, 0.01);
-        addAndMakeVisible(mixSlider_);
-
-        characterLabel_.setText("CHARACTER", juce::dontSendNotification);
-        characterLabel_.setJustificationType(juce::Justification::centredLeft);
-        characterLabel_.setColour(juce::Label::textColourId, RetroPalette::kViewportFrame);
-        characterLabel_.setFont(juce::FontOptions(28.0f, juce::Font::bold));
-        addAndMakeVisible(characterLabel_);
-
-        characterSlider_.setName("CHARACTER");
-        characterSlider_.setSliderStyle(juce::Slider::LinearHorizontal);
-        characterSlider_.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
-        characterSlider_.setRange(0.0, 100.0, 0.01);
-        addAndMakeVisible(characterSlider_);
-
-        effectButton_.setName("EFFECT");
-        effectButton_.setButtonText("EFFECT");
-        effectButton_.setClickingTogglesState(true);
-        addAndMakeVisible(effectButton_);
-
-        mixAttachment_ = std::make_unique<SliderAttachment>(state, enginefield::params::mixId, mixSlider_);
-        characterAttachment_ = std::make_unique<SliderAttachment>(state, enginefield::params::characterId, characterSlider_);
-        effectAttachment_ = std::make_unique<ButtonAttachment>(state, enginefield::params::effectModeId, effectButton_);
+        mixParam_       = state.getRawParameterValue(enginefield::params::mixId);
+        characterParam_ = state.getRawParameterValue(enginefield::params::characterId);
+        effectParam_    = state.getRawParameterValue(enginefield::params::effectModeId);
 
         startTimerHz(kTimerHz);
-        resized(); // initialise bounds
     }
 
-    FieldWaveformEditor::~FieldWaveformEditor()
-    {
-        setLookAndFeel(nullptr);
-    }
+    FieldWaveformEditor::~FieldWaveformEditor() = default;
 
     void FieldWaveformEditor::timerCallback()
     {
         processorRef_.getWaveformPeaks(waveformPeaks_);
         currentLevel_ = clamp01(processorRef_.getCurrentLevel());
-        repaint(viewportBounds_.expanded(8));
+        repaint();
     }
 
     void FieldWaveformEditor::paint(juce::Graphics& g)
     {
         g.fillAll(RetroPalette::kBackground);
 
-        g.setColour(RetroPalette::kViewportFrame);
-        g.drawRect(getLocalBounds(), 4);
+        const float mixAlpha   = mixParam_       ? clamp01(mixParam_->load() * 0.01f)       : 1.0f;
+        const float character  = characterParam_ ? clamp01(characterParam_->load() * 0.01f) : 0.0f;
+        const bool effectOn    = effectParam_    && effectParam_->load() > 0.5f;
 
-        if (!viewportBounds_.isEmpty())
-            drawViewport(g, viewportBounds_);
+        if (auto* skin = effectOn ? skinOn_.get() : skinOff_.get())
+            skin->draw(g, 1.0f);
+
+        auto viewport = viewportPx_;
+        juce::Graphics::ScopedSaveState clipper(g);
+        g.reduceClipRegion(viewport);
+
+        if (!effectOn)
+        {
+            const int y = viewport.getCentreY() - 1;
+            g.setColour(RetroPalette::kBaseline.withAlpha(mixAlpha));
+            for (int x = viewport.getX(); x < viewport.getRight(); x += 8)
+            {
+                const int seg = juce::jmin(x + 4, viewport.getRight());
+                g.fillRect(x, y, seg - x, 2);
+            }
+        }
+
+        drawWaveform(g, viewport, mixAlpha, character);
+        drawPeakTracer(g, viewport, mixAlpha);
+        drawAlivePulse(g, viewport);
     }
 
-    void FieldWaveformEditor::drawViewport(juce::Graphics& g, juce::Rectangle<int> bounds)
+    void FieldWaveformEditor::drawWaveform(juce::Graphics& g, juce::Rectangle<int> viewport, float alpha, float character) const
     {
-        auto frame = bounds;
-        g.setColour(RetroPalette::kViewportFrame);
-        g.drawRect(frame, kViewportFrameThickness);
-
-        auto area = frame.reduced(kViewportFrameThickness + kViewportPadding);
-        area = area.withTrimmedBottom(16);
-
-        g.setColour(RetroPalette::kViewportBackground);
-        g.fillRect(area);
-
-        const auto areaFloat = area.toFloat();
-
-        drawWaveform(g, areaFloat);
-        drawPeakTracer(g, areaFloat);
-        drawLevelMarker(g, areaFloat);
-    }
-
-    void FieldWaveformEditor::drawWaveform(juce::Graphics& g, juce::Rectangle<float> area) const
-    {
-        const int totalBars = static_cast<int>(waveformPeaks_.size());
-        if (totalBars == 0)
+        const int count = static_cast<int>(waveformPeaks_.size());
+        if (count == 0 || alpha <= 0.0f)
             return;
 
-        const float spacing = static_cast<float>(kBarWidth + kBarGap);
-        const float totalWidth = totalBars * spacing - static_cast<float>(kBarGap);
-        const float startXFloat = area.getX() + juce::jmax(0.0f, (area.getWidth() - totalWidth) * 0.5f);
-        const int startX = juce::roundToInt(startXFloat);
-        const int baselineY = juce::roundToInt(area.getCentreY());
-        const float halfHeightF = area.getHeight() * 0.44f;
-        const float dripFactor = 0.2f + clamp01(static_cast<float>(characterSlider_.getValue() * 0.01)) * 0.8f;
+        const float spacing = static_cast<float>(viewport.getWidth()) / static_cast<float>(count);
+        const int barWidth = juce::jmax(1, juce::roundToInt(spacing * 0.7f));
+        const float dripFactor = kDripBase + character * kDripRange;
+        const int baselineY = viewport.getCentreY();
+        const float halfH = viewport.getHeight() * 0.44f;
 
-        g.setColour(RetroPalette::kBarFill);
+        g.setColour(RetroPalette::kBarFill.withAlpha(alpha));
 
-        for (size_t i = 0; i < waveformPeaks_.size(); ++i)
+        float x = static_cast<float>(viewport.getX());
+        for (int i = 0; i < count; ++i, x += spacing)
         {
             const float peak = clamp01(waveformPeaks_[i]);
-            const float aboveF = peak * halfHeightF;
-            const float dripF = aboveF * dripFactor;
-            const int x = startX + juce::roundToInt(static_cast<float>(i) * spacing);
-            const int above = juce::roundToInt(aboveF);
-            const int drip = juce::roundToInt(dripF);
+            const int xi = juce::roundToInt(x);
+            const int above = juce::roundToInt(peak * halfH);
+            const int drip  = juce::roundToInt(peak * halfH * dripFactor);
 
             if (above > 0)
-                g.fillRect(x, baselineY - above, kBarWidth, juce::jmax(1, above));
-
+                g.fillRect(xi, baselineY - above, barWidth, juce::jmax(1, above));
             if (drip > 0)
-                g.fillRect(x, baselineY, kBarWidth, juce::jmax(1, drip));
+                g.fillRect(xi, baselineY, barWidth, juce::jmax(1, drip));
         }
     }
 
-    void FieldWaveformEditor::drawPeakTracer(juce::Graphics& g, juce::Rectangle<float> area) const
+    void FieldWaveformEditor::drawPeakTracer(juce::Graphics& g, juce::Rectangle<int> viewport, float alpha) const
     {
-        const int totalBars = static_cast<int>(waveformPeaks_.size());
-        if (totalBars == 0)
+        const int count = static_cast<int>(waveformPeaks_.size());
+        if (count == 0 || alpha <= 0.0f)
             return;
 
-        juce::Path tracer;
-        const float spacing = static_cast<float>(kBarWidth + kBarGap);
-        const float totalWidth = totalBars * spacing - static_cast<float>(kBarGap);
-        const float startX = static_cast<float>(juce::roundToInt(area.getX() + juce::jmax(0.0f, (area.getWidth() - totalWidth) * 0.5f)))
-                            + static_cast<float>(kBarWidth) * 0.5f;
-        const float baselineY = static_cast<float>(juce::roundToInt(area.getCentreY()));
-        const float halfHeightF = area.getHeight() * 0.44f;
+        const float spacing = static_cast<float>(viewport.getWidth()) / static_cast<float>(count);
+        const int baselineY = viewport.getCentreY();
+        const float halfH = viewport.getHeight() * 0.44f;
 
+        juce::Path path;
         bool started = false;
-        for (size_t i = 0; i < waveformPeaks_.size(); ++i)
+        float x = static_cast<float>(viewport.getX());
+        for (int i = 0; i < count; ++i, x += spacing)
         {
             const float peak = clamp01(waveformPeaks_[i]);
-            const float x = startX + static_cast<float>(juce::roundToInt(static_cast<float>(i) * spacing));
-            const float y = baselineY - peak * halfHeightF;
-
+            const float xi = x + spacing * 0.5f;
+            const float yi = static_cast<float>(baselineY) - peak * halfH;
             if (!started)
             {
-                tracer.startNewSubPath(x, y);
+                path.startNewSubPath(xi, yi);
                 started = true;
             }
             else
             {
-                tracer.lineTo(x, y);
+                path.lineTo(xi, yi);
             }
         }
-
         if (!started)
             return;
 
-        g.setColour(RetroPalette::kPeakTracer.withAlpha(0.45f));
-        g.strokePath(tracer, juce::PathStrokeType(4.0f));
-
-        g.setColour(RetroPalette::kPeakTracer);
-        g.strokePath(tracer, juce::PathStrokeType(2.0f));
+        g.setColour(RetroPalette::kPeakTracer.withAlpha(alpha * 0.45f));
+        g.strokePath(path, juce::PathStrokeType(4.0f));
+        g.setColour(RetroPalette::kPeakTracer.withAlpha(alpha));
+        g.strokePath(path, juce::PathStrokeType(2.0f));
     }
 
-    void FieldWaveformEditor::drawLevelMarker(juce::Graphics& g, juce::Rectangle<float> area) const
+    void FieldWaveformEditor::drawAlivePulse(juce::Graphics& g, juce::Rectangle<int> viewport) const
     {
-        const int markerWidth = 36;
-        const int markerHeight = 5;
-
-        const float minYF = area.getY() + 16.0f;
-        const float maxYF = area.getCentreY() - 24.0f;
-        const int y = juce::roundToInt(juce::jmap(1.0f - currentLevel_, 0.0f, 1.0f, minYF, maxYF));
-        const int x = juce::roundToInt(area.getX() + (area.getWidth() - static_cast<float>(markerWidth)) * 0.5f);
-
+        juce::Rectangle<int> pulse(viewport.getRight() - 11, viewport.getY() + 8, 3, 10);
         g.setColour(RetroPalette::kBaseline);
-        g.fillRect(x, y, markerWidth, markerHeight);
-    }    void FieldWaveformEditor::resized()
+        g.fillRect(pulse);
+    }
+
+    void FieldWaveformEditor::resized()
     {
-        auto bounds = getLocalBounds().reduced(24);
-
-        auto topRow = bounds.removeFromTop(120);
-        auto effectArea = topRow.removeFromRight(180).reduced(12);
-        effectButton_.setBounds(effectArea);
-
-        mixLabel_.setBounds(topRow.removeFromTop(36));
-        mixSlider_.setBounds(topRow.removeFromTop(32));
-
-        auto bottomRow = bounds.removeFromBottom(140);
-        characterLabel_.setBounds(bottomRow.removeFromTop(40));
-        characterSlider_.setBounds(bottomRow.removeFromTop(44));
-
-        viewportBounds_ = bounds;
+        // Fixed layout, no dynamic components.
     }
 } // namespace engine::ui
-
-
-
-
-
-
-
-
-
-
-
-
