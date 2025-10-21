@@ -1,0 +1,59 @@
+{
+  "version": 5,
+  "configurePresets": [
+    {
+      "name": "vs-debug",
+      "displayName": "Visual Studio (Debug)",
+      "generator": "Visual Studio 17 2022",
+      "binaryDir": "${sourceDir}/out/build/vs-x64-debug",
+      "architecture": "x64",
+      "cacheVariables": {
+        "JUCE_SOURCE_DIR": "C:/JUCE/_install",
+        "BUILD_VST3": "ON",
+        "BUILD_STANDALONE": "OFF",
+        "CMAKE_PREFIX_PATH": "C:/JUCE/_install"
+      }
+    },
+    {
+      "name": "vs-release",
+      "displayName": "Visual Studio (Release)",
+      "generator": "Visual Studio 17 2022",
+      "binaryDir": "${sourceDir}/out/build/vs-x64-release",
+      "architecture": "x64",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_CXX_STANDARD": "20",
+        "JUCE_SOURCE_DIR": "C:/JUCE/_install",
+        "BUILD_VST3": "ON",
+        "BUILD_STANDALONE": "OFF",
+        "CMAKE_PREFIX_PATH": "C:/JUCE/_install"
+      }
+    },
+    {
+      "name": "ninja-debug",
+      "displayName": "Ninja (Debug)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/out/build/ninja-x64-debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_CXX_STANDARD": "20",
+        "JUCE_SOURCE_DIR": "C:/JUCE/_install",
+        "BUILD_VST3": "ON",
+        "BUILD_STANDALONE": "OFF",
+        "CMAKE_PREFIX_PATH": "C:/JUCE/_install"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "vs-Rel",
+      "configurePreset": "vs-release",
+      "configuration": "Release"
+    },
+    {
+      "name": "vs-Dbg",
+      "configurePreset": "vs-debug",
+      "configuration": "Debug"
+    }
+  ]
+}
