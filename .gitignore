@@ -1,0 +1,82 @@
+# Build directories
+build/
+Build/
+cmake-build-*/
+
+# CMake cache and generated files
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+*.cmake
+!CMakeLists.txt
+
+# Binary artifacts
+*.exe
+*.dll
+*.so
+*.dylib
+*.vst3
+*.component
+*.aaxplugin
+*.a
+*.lib
+*.obj
+*.o
+
+# IDE and editor files
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+*.sln.docstates
+*.VC.db
+*.VC.opendb
+*.vcxproj.filters
+*.vcxproj.user
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+*.swo
+*~
+
+# Logs and temporary files
+*.log
+*.tmp
+*.temp
+*.bak
+
+# JUCE-specific
+JuceLibraryCode/
+Builds/
+
+# Compiled assets
+BinaryData.cpp
+BinaryData.h
+
+# Package managers
+node_modules/
+.npm/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+*.egg-info/
+dist/
+
+# Archive directories (keep your archived prototypes out of version control)
+ARCHIVE*/
+
+# Session state (optional - may want to track some of this)
+.claude/state/
+sessions/logs/
+
+# Testing artifacts
+pluginval-log.txt
+test-output/

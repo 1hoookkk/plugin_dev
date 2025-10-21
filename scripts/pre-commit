@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+set -euo pipefail
+# Run lock verification before commit
+SCRIPT_DIR="$( cd -- "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+python "$SCRIPT_DIR/verify_lock.py"

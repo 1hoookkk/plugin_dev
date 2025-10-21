@@ -1,0 +1,333 @@
+#pragma once
+#include <juce_gui_basics/juce_gui_basics.h>
+#include <juce_audio_processors/juce_audio_processors.h>
+#include <array>
+
+// Forward declaration
+class FieldProcessor;
+
+namespace engine::ui
+{
+    // Color palette from technical specification
+    namespace FieldColors
+    {
+        const juce::Colour BACKGROUND     { 0xFF2D6DA9 };  // Blue background
+        const juce::Colour VIEWPORT_BG    { 0xFF000000 };  // Pure black viewport
+        const juce::Colour BASELINE       { 0xFF59B850 };  // Green centerline
+        const juce::Colour BAR_FILL       { 0xFFE8D348 };  // Yellow bars
+        const juce::Colour BAR_OUTLINE    { 0xFF606060 };  // Grey outline
+        const juce::Colour PEAK_TRACER    { 0xFFC3FF00 };  // Voltage lime
+        const juce::Colour TEXT_LIGHT     { 0xFFF0F5FB };  // Light text
+        const juce::Colour SLIDER_YELLOW  { 0xFFF9F034 };  // Yellow slider indicator
+        const juce::Colour SLIDER_DARK    { 0xFF1F3750 };  // Dark slider background
+        const juce::Colour EFFECT_ACTIVE  { 0xFFB02020 };  // Red when effect is on
+    }
+
+    /**
+     * Real-time waveform visualizer showing the "drip" effect.
+     * Yellow bars extend both above and below the green baseline,
+     * visualizing the bidirectional energy of the morphing filter.
+     */
+    class WaveformVisualizer : public juce::Component,
+                               private juce::Timer
+    {
+    public:
+        static constexpr int NUM_BARS = 60;
+        static constexpr int BAR_WIDTH = 6;
+        static constexpr int BAR_GAP = 2;
+        static constexpr int TOTAL_BAR_WIDTH = BAR_WIDTH + BAR_GAP; // 8px
+
+        WaveformVisualizer()
+        {
+            waveformPeaks.fill(0.0f);
+            startTimerHz(60); // 60fps refresh
+        }
+
+        void updateWaveform(const std::array<float, NUM_BARS>& peaks, float characterValue)
+        {
+            waveformPeaks = peaks;
+            character = juce::jlimit(0.0f, 1.0f, characterValue);
+        }
+
+        void paint(juce::Graphics& g) override
+        {
+            auto bounds = getLocalBounds().toFloat();
+
+            // Fill viewport background (pure black)
+            g.fillAll(FieldColors::VIEWPORT_BG);
+
+            const float centerY = bounds.getHeight() / 2.0f;
+
+            // Draw green baseline
+            g.setColour(FieldColors::BASELINE);
+            g.drawLine(0.0f, centerY, bounds.getWidth(), centerY, 4.0f);
+
+            // Draw yellow bars with drip effect
+            drawDripBars(g, bounds, centerY);
+
+            // Draw lime peak tracer line
+            drawPeakTracer(g, bounds, centerY);
+        }
+
+    private:
+        void drawDripBars(juce::Graphics& g, juce::Rectangle<float>, float centerY)
+        {
+            const float padding = 16.0f;
+            const float maxHeight = 180.0f; // Maximum displacement from baseline
+
+            for (int i = 0; i < NUM_BARS; ++i)
+            {
+                float x = padding + (i * TOTAL_BAR_WIDTH);
+
+                // Get peak value (0.0 to 1.0)
+                float peak = waveformPeaks[i];
+
+                // Scale to pixel height
+                float heightAbove = peak * maxHeight;
+
+                // Calculate drip amount (bidirectional energy below baseline)
+                // More CHARACTER = more drip effect
+                float heightBelow = heightAbove * character * 0.5f;
+
+                // Calculate bar bounds
+                float topY = centerY - heightAbove;
+                float totalHeight = heightAbove + heightBelow;
+
+                // Skip tiny bars
+                if (totalHeight < 1.0f) continue;
+
+                // Draw yellow fill
+                g.setColour(FieldColors::BAR_FILL);
+                g.fillRect(x, topY, (float)BAR_WIDTH, totalHeight);
+
+                // Draw grey outline (1px outside)
+                g.setColour(FieldColors::BAR_OUTLINE);
+                g.drawRect(x, topY, (float)BAR_WIDTH, totalHeight, 1.0f);
+            }
+        }
+
+        void drawPeakTracer(juce::Graphics& g, juce::Rectangle<float>, float centerY)
+        {
+            juce::Path tracerPath;
+            const float padding = 16.0f;
+            const float maxHeight = 180.0f;
+            bool firstPoint = true;
+
+            for (int i = 0; i < NUM_BARS; ++i)
+            {
+                float x = padding + (i * TOTAL_BAR_WIDTH) + (BAR_WIDTH / 2.0f); // Center of bar
+                float peak = waveformPeaks[i];
+                float heightAbove = peak * maxHeight;
+                float peakY = centerY - heightAbove; // Top of bar
+
+                if (firstPoint)
+                {
+                    tracerPath.startNewSubPath(x, peakY);
+                    firstPoint = false;
+                }
+                else
+                {
+                    tracerPath.lineTo(x, peakY);
+                }
+            }
+
+            // Draw glow effect (thicker, semi-transparent)
+            g.setColour(FieldColors::PEAK_TRACER.withAlpha(0.6f));
+            g.strokePath(tracerPath, juce::PathStrokeType(4.0f));
+
+            // Draw main tracer line
+            g.setColour(FieldColors::PEAK_TRACER);
+            g.strokePath(tracerPath, juce::PathStrokeType(2.0f));
+        }
+
+        void timerCallback() override
+        {
+            repaint();
+        }
+
+        std::array<float, NUM_BARS> waveformPeaks;
+        float character = 0.0f;
+
+        JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(WaveformVisualizer)
+    };
+
+    /**
+     * Main FIELD plugin editor with waveform visualization.
+     * Layout matches the technical specification and SVG mockups.
+     */
+    class FieldWaveformEditor : public juce::AudioProcessorEditor,
+                                private juce::Timer
+    {
+    public:
+        FieldWaveformEditor(juce::AudioProcessor& p, juce::AudioProcessorValueTreeState& apvts)
+            : juce::AudioProcessorEditor(p),
+              valueTreeState(apvts),
+              processor(p)
+        {
+            setSize(420, 560);
+
+            // Add waveform visualizer
+            addAndMakeVisible(waveformView);
+
+            // MIX slider (horizontal, top left)
+            addAndMakeVisible(mixSlider);
+            mixSlider.setSliderStyle(juce::Slider::LinearHorizontal);
+            mixSlider.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
+            mixSlider.setRange(0.0, 100.0, 0.1);
+            mixAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
+                valueTreeState, "mix", mixSlider);
+
+            // MIX label
+            addAndMakeVisible(mixLabel);
+            mixLabel.setText("MIX", juce::dontSendNotification);
+            mixLabel.setJustificationType(juce::Justification::topLeft);
+            mixLabel.setFont(juce::FontOptions(16.0f, juce::Font::bold));
+            mixLabel.setColour(juce::Label::textColourId, FieldColors::TEXT_LIGHT);
+
+            // EFFECT button (top right)
+            addAndMakeVisible(effectButton);
+            effectButton.setButtonText("EFFECT");
+            effectButton.setClickingTogglesState(true);
+            effectButton.onClick = [this]() {
+                updateEffectButtonState();
+            };
+
+            // CHARACTER slider (horizontal, bottom)
+            addAndMakeVisible(characterSlider);
+            characterSlider.setSliderStyle(juce::Slider::LinearHorizontal);
+            characterSlider.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
+            characterSlider.setRange(0.0, 100.0, 0.1);
+            characterAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
+                valueTreeState, "character", characterSlider);
+
+            // CHARACTER label
+            addAndMakeVisible(characterLabel);
+            characterLabel.setText("CHARACTER", juce::dontSendNotification);
+            characterLabel.setJustificationType(juce::Justification::centredLeft);
+            characterLabel.setFont(juce::FontOptions(12.0f, juce::Font::bold));
+            characterLabel.setColour(juce::Label::textColourId, FieldColors::TEXT_LIGHT);
+
+            // Start timer for waveform updates
+            startTimerHz(60);
+        }
+
+        void paint(juce::Graphics& g) override
+        {
+            // Background
+            g.fillAll(FieldColors::BACKGROUND);
+
+            // Draw MIX slider background (yellow bar style)
+            auto mixBounds = mixSlider.getBounds().toFloat();
+            g.setColour(FieldColors::SLIDER_DARK);
+            g.fillRoundedRectangle(mixBounds.expanded(4, 2), 4.0f);
+
+            // Draw CHARACTER slider background (large yellow indicator style)
+            auto charBounds = characterSlider.getBounds().toFloat();
+            g.setColour(FieldColors::SLIDER_DARK);
+            g.fillRoundedRectangle(charBounds.expanded(8, 4), 6.0f);
+
+            // Viewport frame (stroke around waveform area)
+            auto viewportBounds = waveformView.getBounds().toFloat();
+            g.setColour(FieldColors::TEXT_LIGHT);
+            g.drawRoundedRectangle(viewportBounds.expanded(2, 2), 0.0f, 3.0f);
+        }
+
+        void resized() override
+        {
+            auto area = getLocalBounds();
+
+            // Top section - MIX and EFFECT button (height: 78px)
+            auto topSection = area.removeFromTop(78);
+            topSection.removeFromTop(20); // Padding
+
+            // MIX label (top left)
+            auto mixArea = topSection.removeFromLeft(200).reduced(16, 0);
+            mixLabel.setBounds(mixArea.removeFromTop(18));
+            mixArea.removeFromTop(6); // Small gap
+            mixSlider.setBounds(mixArea.removeFromTop(20));
+
+            // EFFECT button (top right)
+            topSection.removeFromLeft(10); // Spacing
+            auto buttonBounds = topSection.reduced(16, 8);
+            buttonBounds.setWidth(98);
+            buttonBounds.setHeight(44);
+            effectButton.setBounds(buttonBounds);
+
+            // Center viewport (waveform display) - height: 372px
+            area.removeFromTop(12); // Padding
+            auto viewportArea = area.removeFromTop(372);
+            waveformView.setBounds(viewportArea.reduced(16, 12));
+
+            // Bottom section - CHARACTER slider (height: 98px)
+            area.removeFromTop(12); // Padding
+            auto bottomSection = area.removeFromBottom(98);
+            bottomSection = bottomSection.reduced(16, 20);
+
+            characterLabel.setBounds(bottomSection.removeFromTop(18));
+            bottomSection.removeFromTop(8); // Gap
+            characterSlider.setBounds(bottomSection.removeFromTop(48));
+        }
+
+    private:
+        void timerCallback() override
+        {
+            // Get waveform data from processor (lock-free read)
+            std::array<float, WaveformVisualizer::NUM_BARS> peaks;
+
+            // Cast processor to FieldProcessor to access getWaveformPeaks
+            auto* fieldProcessor = dynamic_cast<FieldProcessor*>(&processor);
+            if (fieldProcessor != nullptr)
+            {
+                fieldProcessor->getWaveformPeaks(peaks);
+            }
+            else
+            {
+                peaks.fill(0.0f);
+            }
+
+            float characterValue = static_cast<float>(characterSlider.getValue() / 100.0);
+            waveformView.updateWaveform(peaks, characterValue);
+        }
+
+        void updateEffectButtonState()
+        {
+            bool isActive = effectButton.getToggleState();
+
+            // Update button appearance
+            if (isActive)
+            {
+                effectButton.setColour(juce::TextButton::buttonColourId, FieldColors::EFFECT_ACTIVE);
+                effectButton.setColour(juce::TextButton::textColourOnId, FieldColors::TEXT_LIGHT);
+            }
+            else
+            {
+                effectButton.setColour(juce::TextButton::buttonColourId, juce::Colours::transparentBlack);
+                effectButton.setColour(juce::TextButton::buttonOnColourId, FieldColors::EFFECT_ACTIVE);
+                effectButton.setColour(juce::TextButton::textColourOnId, FieldColors::TEXT_LIGHT);
+                effectButton.setColour(juce::TextButton::textColourOffId, FieldColors::TEXT_LIGHT);
+            }
+
+            // Send to processor (effectMode parameter should exist from old implementation)
+            if (auto* param = valueTreeState.getParameter("effectMode"))
+                param->setValueNotifyingHost(isActive ? 1.0f : 0.0f);
+        }
+
+        juce::AudioProcessorValueTreeState& valueTreeState;
+        juce::AudioProcessor& processor;
+
+        WaveformVisualizer waveformView;
+
+        juce::Slider mixSlider;
+        juce::Label mixLabel;
+
+        juce::Slider characterSlider;
+        juce::Label characterLabel;
+
+        juce::TextButton effectButton;
+
+        std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> mixAttachment;
+        std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> characterAttachment;
+
+        JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(FieldWaveformEditor)
+    };
+}
