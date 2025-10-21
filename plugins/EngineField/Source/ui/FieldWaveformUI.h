@@ -6,6 +6,7 @@
 #include <memory>
 
 #include "VisualisationConfig.h"
+#include "FieldLookAndFeel.h"
 
 class FieldProcessor;
 
@@ -50,6 +51,19 @@ namespace engine::ui
 
         std::array<float, engine::viz::kWaveformBarCount> waveformPeaks_ {};
         float currentLevel_ = 0.0f;
+
+        // Interactive controls (v1.0.1 hotfix)
+        juce::Slider mixSlider_;
+        juce::Slider characterSlider_;
+        juce::TextButton effectButton_;
+
+        // APVTS attachments for two-way parameter binding
+        std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> mixAttachment_;
+        std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> characterAttachment_;
+        std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> effectAttachment_;
+
+        // Custom LookAndFeel for retro pixel-perfect controls
+        FieldLookAndFeel fieldLNF_;
 
         JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(FieldWaveformEditor)
     };

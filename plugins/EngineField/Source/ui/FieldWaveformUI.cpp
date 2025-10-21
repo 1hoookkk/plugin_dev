@@ -35,6 +35,35 @@ namespace engine::ui
         characterParam_ = state.getRawParameterValue(enginefield::params::characterId);
         effectParam_    = state.getRawParameterValue(enginefield::params::effectModeId);
 
+        // Configure MIX slider (horizontal, top-left)
+        mixSlider_.setName("MIX");
+        mixSlider_.setSliderStyle(juce::Slider::LinearHorizontal);
+        mixSlider_.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
+        mixSlider_.setLookAndFeel(&fieldLNF_);
+        addAndMakeVisible(mixSlider_);
+
+        // Configure CHARACTER slider (horizontal, bottom)
+        characterSlider_.setName("CHARACTER");
+        characterSlider_.setSliderStyle(juce::Slider::LinearHorizontal);
+        characterSlider_.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
+        characterSlider_.setLookAndFeel(&fieldLNF_);
+        addAndMakeVisible(characterSlider_);
+
+        // Configure EFFECT button (toggle, top-right)
+        effectButton_.setName("EFFECT");
+        effectButton_.setButtonText("");  // SVG shows label
+        effectButton_.setClickingTogglesState(true);
+        effectButton_.setLookAndFeel(&fieldLNF_);
+        addAndMakeVisible(effectButton_);
+
+        // Create APVTS attachments (two-way parameter binding)
+        mixAttachment_ = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
+            state, enginefield::params::mixId, mixSlider_);
+        characterAttachment_ = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
+            state, enginefield::params::characterId, characterSlider_);
+        effectAttachment_ = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(
+            state, enginefield::params::effectModeId, effectButton_);
+
         startTimerHz(kTimerHz);
     }
 
@@ -153,6 +182,17 @@ namespace engine::ui
 
     void FieldWaveformEditor::resized()
     {
-        // Fixed layout, no dynamic components.
+        // Position interactive controls to overlay SVG graphics (pixel-perfect alignment)
+        // Coordinates based on PNG design reference and SVG element positions
+
+        // MIX slider - top-left horizontal bar
+        mixSlider_.setBounds(40, 50, 110, 24);
+
+        // EFFECT button - top-right toggle
+        effectButton_.setBounds(390, 40, 105, 35);
+
+        // CHARACTER slider - bottom horizontal bar
+        // Note: Window is 560px tall, so y=500 places it near bottom
+        characterSlider_.setBounds(43, 500, 455, 24);
     }
 } // namespace engine::ui

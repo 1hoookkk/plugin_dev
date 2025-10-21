@@ -40,8 +40,8 @@ void FieldProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 
     env_.prepare(sampleRate);
     env_.setAttackMs(0.489f);
-    env_.setReleaseMs(80.0f);                   
-    env_.setDepth(0.945f);
+    env_.setReleaseMs(80.0f);
+    env_.setDepth(0.75f);  // v1.0.1: Reduced from 0.945 for balanced modulation (±15% vs ±18.9%)
 
     // Initialize UI envelope follower
     const float sr = static_cast<float>(sampleRate);
