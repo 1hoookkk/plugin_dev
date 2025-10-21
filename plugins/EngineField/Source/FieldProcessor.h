@@ -1,13 +1,16 @@
 #pragma once
+
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_audio_basics/juce_audio_basics.h>
-#include <atomic>
-#include <vector>
+
 #include "parameters.h"
 #include "dsp/ZPlaneFilter.h"
 #include "dsp/EMUAuthenticTables.h"
 #include "dsp/EnvelopeFollower.h"
 #include "ui/VisualisationConfig.h"
+
+#include <atomic>
+#include <vector>
 
 class FieldProcessor : public juce::AudioProcessor
 {
@@ -133,6 +136,3 @@ private:
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(FieldProcessor)
 };
-
-
-

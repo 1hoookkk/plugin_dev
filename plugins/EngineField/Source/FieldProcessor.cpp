@@ -1,9 +1,9 @@
 #include "FieldProcessor.h"
 #include "ui/FieldWaveformUI.h"
+
 #include <algorithm>
 #include <cstring>
 #include <cmath>
-
 
 FieldProcessor::FieldProcessor()
     : juce::AudioProcessor (BusesProperties().withInput("Input", juce::AudioChannelSet::stereo(), true)
@@ -57,7 +57,8 @@ void FieldProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
     const bool currentBypass = bypassParam_->load() > 0.5f;
     bypassSmooth_.setCurrentAndTargetValue(currentBypass ? 0.0f : 1.0f);
 
-    uiWaveformFifo_.reset(); uiWaveformRingBuffer_.assign(kWaveformDepth, 0.0f);
+    uiWaveformFifo_.reset();
+    uiWaveformRingBuffer_.assign(kWaveformDepth, 0.0f);
 }
 
 void FieldProcessor::releaseResources()
@@ -70,8 +71,6 @@ bool FieldProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const
     const auto& out = layouts.getChannelSet(false, 0);
     return in == juce::AudioChannelSet::stereo() && out == juce::AudioChannelSet::stereo();
 }
-
-
 
 void FieldProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi)
 {
@@ -91,7 +90,13 @@ void FieldProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiB
         {
             auto* data = buffer.getWritePointer(ch);
             double p = testTonePhase_;
-            for (int i = 0; i < numSamples; ++i) { data[i] = (float)std::sin(p) * 0.05f; p += inc; if (p >= juce::MathConstants<double>::twoPi) p -= juce::MathConstants<double>::twoPi; }
+            for (int i = 0; i < numSamples; ++i)
+            {
+                data[i] = static_cast<float>(std::sin(p)) * 0.05f;
+                p += inc;
+                if (p >= juce::MathConstants<double>::twoPi)
+                    p -= juce::MathConstants<double>::twoPi;
+            }
             testTonePhase_ = p;
         }
     }
@@ -258,6 +263,3 @@ int FieldProcessor::getWaveformSamples(float* destBuffer, int maxSamples) noexce
     uiWaveformFifo_.finishedRead(size1 + size2);
     return (size1 + size2);
 }
-
-
-
