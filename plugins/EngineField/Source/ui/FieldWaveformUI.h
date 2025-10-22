@@ -52,6 +52,10 @@ namespace engine::ui
         std::array<float, engine::viz::kWaveformBarCount> waveformPeaks_ {};
         float currentLevel_ = 0.0f;
 
+        // UI Hotfix B: Cached resources to eliminate per-frame allocations/draw calls
+        mutable juce::Path peakTracerPath_;   // Reused each paint (no allocation)
+        juce::Image cachedBaseline_;          // Pre-rendered dashed baseline (blit instead of 48 fillRect calls)
+
         // Interactive controls (v1.0.1 hotfix)
         juce::Slider mixSlider_;
         juce::Slider characterSlider_;

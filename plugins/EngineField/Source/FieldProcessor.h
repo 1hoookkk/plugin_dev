@@ -101,6 +101,7 @@ private:
     std::atomic<float>* gainParam_ = nullptr;
     std::atomic<float>* bypassParam_ = nullptr;
     std::atomic<float>* effectModeParam_ = nullptr;
+    std::atomic<float>* testToneParam_ = nullptr;  // Patch 1: avoid APVTS tree traversal
 
     // Dry buffer (pre-allocated)
     juce::AudioBuffer<float> dryBuffer_;

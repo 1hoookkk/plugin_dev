@@ -64,6 +64,18 @@ namespace engine::ui
         effectAttachment_ = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(
             state, enginefield::params::effectModeId, effectButton_);
 
+        // UI Hotfix B: Pre-render dashed baseline once (eliminate 48 fillRect calls per frame)
+        cachedBaseline_ = juce::Image(juce::Image::ARGB, viewportPx_.getWidth(), 2, true);
+        {
+            juce::Graphics g(cachedBaseline_);
+            g.setColour(RetroPalette::kBaseline);
+            for (int x = 0; x < viewportPx_.getWidth(); x += 8)
+            {
+                const int seg = juce::jmin(x + 4, viewportPx_.getWidth());
+                g.fillRect(x, 0, seg - x, 2);
+            }
+        }
+
         startTimerHz(kTimerHz);
     }
 
@@ -73,7 +85,8 @@ namespace engine::ui
     {
         processorRef_.getWaveformPeaks(waveformPeaks_);
         currentLevel_ = clamp01(processorRef_.getCurrentLevel());
-        repaint();
+        // UI Hotfix B: Repaint only viewport (42% reduction: 235,200px → 135,024px)
+        repaint(viewportPx_);
     }
 
     void FieldWaveformEditor::paint(juce::Graphics& g)
@@ -93,13 +106,10 @@ namespace engine::ui
 
         if (!effectOn)
         {
+            // UI Hotfix B: Blit pre-rendered baseline (1 call vs 48 fillRect calls)
             const int y = viewport.getCentreY() - 1;
-            g.setColour(RetroPalette::kBaseline.withAlpha(mixAlpha));
-            for (int x = viewport.getX(); x < viewport.getRight(); x += 8)
-            {
-                const int seg = juce::jmin(x + 4, viewport.getRight());
-                g.fillRect(x, y, seg - x, 2);
-            }
+            g.setOpacity(mixAlpha);
+            g.drawImageAt(cachedBaseline_, viewport.getX(), y);
         }
 
         drawWaveform(g, viewport, mixAlpha, character);
@@ -146,7 +156,8 @@ namespace engine::ui
         const int baselineY = viewport.getCentreY();
         const float halfH = viewport.getHeight() * 0.44f;
 
-        juce::Path path;
+        // UI Hotfix B: Reuse cached path (no per-frame allocation)
+        peakTracerPath_.clear();
         bool started = false;
         float x = static_cast<float>(viewport.getX());
         for (int i = 0; i < count; ++i, x += spacing)
@@ -156,21 +167,25 @@ namespace engine::ui
             const float yi = static_cast<float>(baselineY) - peak * halfH;
             if (!started)
             {
-                path.startNewSubPath(xi, yi);
+                peakTracerPath_.startNewSubPath(xi, yi);
                 started = true;
             }
             else
             {
-                path.lineTo(xi, yi);
+                peakTracerPath_.lineTo(xi, yi);
             }
         }
         if (!started)
             return;
 
+        // UI Hotfix B: Use static PathStrokeType objects (avoid per-frame construction)
+        static const juce::PathStrokeType kWideStroke(4.0f);
+        static const juce::PathStrokeType kThinStroke(2.0f);
+
         g.setColour(RetroPalette::kPeakTracer.withAlpha(alpha * 0.45f));
-        g.strokePath(path, juce::PathStrokeType(4.0f));
+        g.strokePath(peakTracerPath_, kWideStroke);
         g.setColour(RetroPalette::kPeakTracer.withAlpha(alpha));
-        g.strokePath(path, juce::PathStrokeType(2.0f));
+        g.strokePath(peakTracerPath_, kThinStroke);
     }
 
     void FieldWaveformEditor::drawAlivePulse(juce::Graphics& g, juce::Rectangle<int> viewport) const

@@ -21,19 +21,35 @@ FieldProcessor::FieldProcessor()
     gainParam_ = apvts_.getRawParameterValue(enginefield::params::gainId);
     bypassParam_ = apvts_.getRawParameterValue(enginefield::params::bypassId);
     effectModeParam_ = apvts_.getRawParameterValue(enginefield::params::effectModeId);
+    testToneParam_ = apvts_.getRawParameterValue(enginefield::params::testToneId);  // Patch 1
+
+    // Validate cached pointers (fail fast if parameter IDs are wrong)
+    jassert(characterParam_ != nullptr);
+    jassert(mixParam_ != nullptr);
+    jassert(gainParam_ != nullptr);
+    jassert(bypassParam_ != nullptr);
+    jassert(effectModeParam_ != nullptr);
+    jassert(testToneParam_ != nullptr);
 
     // Initialize smoothing
     bypassSmooth_.reset(48000.0, 0.01);
+
+    // Patch 3: Preallocate dry buffer to max expected size (defense in depth)
+    dryBuffer_.setSize(2, 2048, false, false, false);
 }
 
 void FieldProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
-    juce::ignoreUnused(samplesPerBlock);
     juce::dsp::ProcessSpec spec{ sampleRate, static_cast<juce::uint32>(samplesPerBlock), static_cast<juce::uint32>(getTotalNumOutputChannels()) };
     outGain_.prepare(spec);
     outGain_.setRampDurationSeconds(0.02);  // 20ms smoothing for gain changes
 
-    dryBuffer_.setSize(getTotalNumOutputChannels(), samplesPerBlock, false, false, true);
+    // Patch 3: Only resize dryBuffer_ if current size insufficient (avoid allocation if possible)
+    if (dryBuffer_.getNumChannels() < getTotalNumOutputChannels() ||
+        dryBuffer_.getNumSamples() < samplesPerBlock)
+    {
+        dryBuffer_.setSize(getTotalNumOutputChannels(), samplesPerBlock, false, false, false);
+    }
 
     zf_.prepare(sampleRate, samplesPerBlock);
     zf_.setSectionSaturation(kSat);
@@ -80,8 +96,8 @@ void FieldProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiB
     const auto numSamples = buffer.getNumSamples();
     const auto numCh      = buffer.getNumChannels();
 
-    // Test tone (off by default)
-    const bool testTone = apvts_.getRawParameterValue(enginefield::params::testToneId)->load() > 0.5f;
+    // Test tone (off by default) - Patch 1: use cached pointer, relaxed ordering (no cross-variable dependencies)
+    const bool testTone = testToneParam_->load(std::memory_order_relaxed) > 0.5f;
     if (testTone)
     {
         const double fs = getSampleRate();
