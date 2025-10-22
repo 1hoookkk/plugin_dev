@@ -16,7 +16,7 @@
         "CMAKE_CXX_STANDARD": "20",
         "BUILD_VST3": "ON",
         "BUILD_STANDALONE": "ON",
-        "JUCE_SOURCE_DIR": "${sourceDir}/JUCE"
+        "CMAKE_PREFIX_PATH": "C:/JUCE/_install"
       }
     },
     {

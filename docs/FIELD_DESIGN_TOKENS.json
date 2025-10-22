@@ -1,0 +1,184 @@
+{
+  "color": {
+    "chassis": {
+      "primary": {
+        "value": "#3B7FC4",
+        "description": "Vibrant saturated blue - main frame and control backgrounds"
+      }
+    },
+    "viewport": {
+      "base": {
+        "value": "#000000",
+        "description": "Pure black - visualization container background"
+      }
+    },
+    "accent": {
+      "voltage-lime": {
+        "value": "#C3FF00",
+        "description": "Processed signal trace, delta fill - bright lime/yellow"
+      },
+      "slider-thumb": {
+        "value": "#E8D348",
+        "description": "Slider thumb fill - warm yellow (slightly less saturated for readability)"
+      },
+      "crt-green": {
+        "value": "#3DD665",
+        "description": "Input signal trace, alive indicator pulse"
+      }
+    },
+    "text": {
+      "primary": {
+        "value": "#FFFFFF",
+        "description": "Main labels and readouts on blue chassis"
+      },
+      "secondary": {
+        "value": "#EAEAEA",
+        "description": "Secondary text on black viewport"
+      },
+      "inverse": {
+        "value": "#000000",
+        "description": "Text on lime accent (when EFFECT button is ON)"
+      }
+    },
+    "border": {
+      "hard": {
+        "value": "#111111",
+        "description": "1px border between blue chassis and black viewport"
+      },
+      "soft": {
+        "value": "#EAEAEA",
+        "description": "1px border for light separation on dark backgrounds"
+      },
+      "thumb-outline": {
+        "value": "#606060",
+        "description": "Subtle grey outline around yellow slider thumbs - creates pop against blue/black"
+      }
+    },
+    "state": {
+      "flash": {
+        "value": "#3DD665",
+        "description": "100ms feedback flash on interaction - lime green"
+      }
+    }
+  },
+  "font": {
+    "family": {
+      "label": {
+        "value": "DM Sans, Satoshi, -apple-system, sans-serif",
+        "description": "Bold sans for control labels (all caps)"
+      },
+      "numeric": {
+        "value": "IBM Plex Mono, 'Courier New', monospace",
+        "description": "Monospaced for value readouts and technical data"
+      }
+    },
+    "size": {
+      "label": {
+        "value": "12px",
+        "description": "Control labels (MIX, CHARACTER, EFFECT)"
+      },
+      "readout": {
+        "value": "12px",
+        "description": "Numeric value chips (63%, etc.)"
+      },
+      "caption": {
+        "value": "11px",
+        "description": "Secondary annotations"
+      }
+    },
+    "weight": {
+      "bold": {
+        "value": "700",
+        "description": "All control labels"
+      },
+      "regular": {
+        "value": "400",
+        "description": "Numeric readouts"
+      }
+    },
+    "transform": {
+      "labels": {
+        "value": "uppercase",
+        "description": "All control labels are uppercase"
+      }
+    }
+  },
+  "spacing": {
+    "unit": {
+      "value": "4px",
+      "description": "Base spacing unit - all spacing is multiples of 4px"
+    },
+    "control-padding": {
+      "value": "16px",
+      "description": "Standard padding around control regions"
+    },
+    "viewport-margin": {
+      "value": "0px",
+      "description": "No margin - viewport bleeds to edges with 1px border"
+    },
+    "slider-height": {
+      "value": "20px",
+      "description": "Standard slider track height (MIX)"
+    },
+    "slider-height-hero": {
+      "value": "22px",
+      "description": "CHARACTER slider height (primary control)"
+    }
+  },
+  "radius": {
+    "none": {
+      "value": "0px",
+      "description": "No border radius - all elements are sharp-cornered"
+    }
+  },
+  "border": {
+    "width": {
+      "standard": {
+        "value": "1px",
+        "description": "All borders are exactly 1px - no thick strokes"
+      }
+    }
+  },
+  "animation": {
+    "flash-duration": {
+      "value": "100ms",
+      "description": "Instant feedback flash on press/drag start"
+    },
+    "slide-duration": {
+      "value": "150ms",
+      "description": "Slider thumb movement (ease-out)"
+    },
+    "fade-duration": {
+      "value": "600ms",
+      "description": "Value chip fade-out after interaction"
+    },
+    "easing": {
+      "value": "cubic-bezier(0.25, 0.1, 0.25, 1)",
+      "description": "Ease-out curve for slider animations"
+    }
+  },
+  "layout": {
+    "aspect-ratio": {
+      "value": "9:16",
+      "description": "Portrait ratio - compact vertical device"
+    },
+    "default-size": {
+      "width": {
+        "value": "360px"
+      },
+      "height": {
+        "value": "640px"
+      }
+    },
+    "regions": {
+      "header": {
+        "value": "72px",
+        "description": "Top control rail (MIX slider + EFFECT button)"
+      },
+      "footer": {
+        "value": "56px",
+        "description": "Bottom control rail (CHARACTER slider)"
+      }
+    }
+  }
+}

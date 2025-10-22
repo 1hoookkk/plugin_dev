@@ -81,3 +81,34 @@ sessions/logs/
 # Testing artifacts
 pluginval-log.txt
 test-output/
+
+# Development files
+deepseek_*.py
+setup_deepseek.sh
+*.zip
+tmp*
+status_report.md
+*.patch
+*.original
+
+# Local Claude settings
+.claude/settings.local.json
+
+# Temporary folders
+New folder/
+
+# Generated images
+Generated Image*.png
+
+# Temporary processor files
+FieldEditor.cpp
+FieldEditor.h
+FieldProcessor.cpp
+FieldProcessor.h
+parameters.h
+
+# PDF documentation
+*.pdf
+
+# Legacy JUCE files
+*.jucer
