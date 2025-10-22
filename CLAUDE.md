@@ -1,29 +1,35 @@
 # CLAUDE.md — Engine:Field
 
-**Status:** v1.0 Released (hotfix required) • **JUCE:** 8.0.10+ • **Formats:** VST3 / Standalone
+**Status:** v1.0.1 Released • **JUCE:** 8.0.10+ • **Formats:** VST3 / Standalone
 
 ## Overview
 Authentic EMU Z‑plane filtering plugin with waveform visualization UI. 6-stage biquad cascade (12th-order IIR) with bilinear frequency warping, geodesic pole interpolation, and equal-power mixing. Strict RT safety.
 
 ## Build
 ```bash
+# Using CMake presets (recommended)
+cmake --preset windows-release
+cmake --build --preset windows-release
+
+# Or traditional approach
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release \
-  -DJUCE_SOURCE_DIR="C:/JUCE" -DBUILD_STANDALONE=ON -DBUILD_VST3=ON
+  -DCMAKE_PREFIX_PATH="C:/JUCE/_install" -DBUILD_STANDALONE=ON -DBUILD_VST3=ON
 cmake --build build --config Release
 ```
 
 ## Active UI
 **FieldWaveformEditor** (`plugins/EngineField/Source/ui/FieldWaveformUI.h/cpp`)
 - 420×560px retro waveform visualization (60 bars, blue/yellow/green palette)
-- Reads CHARACTER/MIX/EFFECT via cached APVTS atomics
-- **⚠️ CRITICAL:** No interactive controls - visualization only, parameters controlled via DAW automation
-- **Standalone mode unusable** - requires control implementation
+- Interactive controls: MIX slider, CHARACTER slider, EFFECT button (v1.0.1)
+- APVTS attachments for two-way parameter sync with DAW automation
+- Custom FieldLookAndFeel for retro pixel-perfect rendering
+- Standalone mode fully functional
 
 ## DSP Architecture
 **ZPlaneFilter** (locked for authentic EMU character):
 - 6× biquad cascade, per-section tanh saturation (0.2)
 - **Locked values:** intensity=0.4, drive=0.2, pole_limit=0.9950
-- **Envelope follower:** 0.489ms attack, 80ms release, **depth=0.945** (modulates CHARACTER ±20%)
+- **Envelope follower:** 0.489ms attack, 80ms release, **depth=0.75** (modulates CHARACTER ±15%, v1.0.1)
 - Bilinear frequency warping (48kHz ref → target SR) with fast-path optimization
 - Geodesic (log-space) radius interpolation - toggle via `GEODESIC_RADIUS` constant
 - Equal-power dry/wet mixing: `wetGain=sqrt(mix)`, `dryGain=sqrt(1-mix)`
@@ -70,12 +76,12 @@ cmake --build build --config Release
 - `plugins/EngineField/Source/ui/FieldWaveformUI.cpp` - Initialized controls + layout in resized()
 - `plugins/EngineField/Source/ui/FieldLookAndFeel.h` - Custom retro LookAndFeel (already existed)
 
-### 2. Overly Aggressive DSP at Defaults ✅ TUNED in v1.0.1
+### 2. Overly Aggressive DSP at Defaults ✅ FIXED in v1.0.1
 **Problem (v1.0):** CHARACTER=50%, MIX=100% produced excessive resonance on drum transients.
 
 **Solution (v1.0.1):** Reduced envelope depth to 0.75 (was 0.945):
 - CHARACTER=50% now modulates ±15% (was ±18.9%)
-- Transients still audibly processed but less extreme
+- Balanced transient processing at default settings
 - User can easily dial in desired intensity
 - Maintains authentic EMU character (pole_radius=0.995, 6-stage cascade)
 
@@ -99,14 +105,15 @@ cmake --build build --config Release
 - Envelope follower: `FieldProcessor.cpp:42-44`
 - UI data flow: `FieldProcessor.h:50-76` (lock-free atomics)
 
-## v1.0.1 Hotfix Checklist
+## v1.0.1 Release Checklist
 - [x] Implement FieldWaveformUI controls (sliders, knobs, APVTS attachments)
 - [x] Calibrate envelope depth to 0.75 for balanced defaults
 - [x] Verify EFFECT toggle solos wet signal correctly (FieldProcessor.cpp:133)
-- [x] Update CLAUDE.md to reflect fixes
+- [x] Update CLAUDE.md to reflect v1.0.1 shipped
 - [x] Build successfully (VST3: 5.8MB, Standalone: 6.9MB)
 - [x] Verify standalone mode has functional controls
-- [ ] Tag release v1.0.1 and commit
+- [x] Clean repository hygiene (remove duplicates, update gitignore)
+- [ ] Tag release v1.0.1 and push
 
 ## Sessions System
 @CLAUDE.sessions.md

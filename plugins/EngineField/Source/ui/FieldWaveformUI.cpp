@@ -184,15 +184,15 @@ namespace engine::ui
     {
         // Position interactive controls to overlay SVG graphics (pixel-perfect alignment)
         // Coordinates based on PNG design reference and SVG element positions
+        // Window size: 420×560px (set in constructor line 29)
 
         // MIX slider - top-left horizontal bar
         mixSlider_.setBounds(40, 50, 110, 24);
 
-        // EFFECT button - top-right toggle
-        effectButton_.setBounds(390, 40, 105, 35);
+        // EFFECT button - top-right toggle (v1.0.1: fixed out-of-bounds bug)
+        effectButton_.setBounds(285, 40, 100, 35);  // Was 390, causing right edge @ 495px > 420px window
 
         // CHARACTER slider - bottom horizontal bar
-        // Note: Window is 560px tall, so y=500 places it near bottom
-        characterSlider_.setBounds(43, 500, 455, 24);
+        characterSlider_.setBounds(40, 500, 340, 24);  // Aligned x with MIX, width scaled to fit
     }
 } // namespace engine::ui
