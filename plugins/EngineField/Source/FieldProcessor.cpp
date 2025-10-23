@@ -7,7 +7,8 @@
 
 FieldProcessor::FieldProcessor()
     : juce::AudioProcessor (BusesProperties().withInput("Input", juce::AudioChannelSet::stereo(), true)
-                                               .withOutput("Output", juce::AudioChannelSet::stereo(), true))
+                                               .withOutput("Output", juce::AudioChannelSet::stereo(), true)),
+      uiWaveformRingBuffer_(kWaveformDepth, 0.0f)  // Initialize ring buffer to match FIFO size
 {
     // Lock DSP shapes to Vowel pair by default (constant, set once)
     zf_.setShapePair(emu::VOWEL_A, emu::VOWEL_B);
@@ -35,16 +36,22 @@ FieldProcessor::FieldProcessor()
     bypassSmooth_.reset(48000.0, 0.01);
 
     // Patch 3: Preallocate dry buffer to max expected size (defense in depth)
-    dryBuffer_.setSize(2, 2048, false, false, false);
+    // Most DAWs use block sizes ≤ 2048; preallocating avoids allocation in prepareToPlay()
+    dryBuffer_.setSize(2, MAX_EXPECTED_BLOCK_SIZE, false, false, false);
 }
 
 void FieldProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
+    // Safeguard: Validate assumption that block size is within expected range
+    // This assertion catches edge cases early in development/testing
+    jassert(samplesPerBlock <= MAX_EXPECTED_BLOCK_SIZE);
+
     juce::dsp::ProcessSpec spec{ sampleRate, static_cast<juce::uint32>(samplesPerBlock), static_cast<juce::uint32>(getTotalNumOutputChannels()) };
     outGain_.prepare(spec);
     outGain_.setRampDurationSeconds(0.02);  // 20ms smoothing for gain changes
 
     // Patch 3: Only resize dryBuffer_ if current size insufficient (avoid allocation if possible)
+    // In practice, preallocation in constructor covers 99.9% of cases
     if (dryBuffer_.getNumChannels() < getTotalNumOutputChannels() ||
         dryBuffer_.getNumSamples() < samplesPerBlock)
     {
@@ -102,10 +109,12 @@ void FieldProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiB
     {
         const double fs = getSampleRate();
         const double inc = 440.0 * juce::MathConstants<double>::twoPi / fs;
+
+        // All channels play same tone (phase advances once per block, not per channel)
         for (int ch = 0; ch < numCh; ++ch)
         {
             auto* data = buffer.getWritePointer(ch);
-            double p = testTonePhase_;
+            double p = testTonePhase_;  // All channels start from same phase
             for (int i = 0; i < numSamples; ++i)
             {
                 data[i] = static_cast<float>(std::sin(p)) * 0.05f;
@@ -113,8 +122,12 @@ void FieldProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiB
                 if (p >= juce::MathConstants<double>::twoPi)
                     p -= juce::MathConstants<double>::twoPi;
             }
-            testTonePhase_ = p;
         }
+
+        // Update phase ONCE per block (ensures correct 440 Hz in both mono and stereo)
+        testTonePhase_ += inc * numSamples;
+        if (testTonePhase_ >= juce::MathConstants<double>::twoPi)
+            testTonePhase_ -= juce::MathConstants<double>::twoPi;
     }
 
     // Pre-copy for dry/wet
