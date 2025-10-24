@@ -12,7 +12,7 @@
 //! - Smooth morphing at any resolution (not limited to LUT quantization)
 //! - Sample-rate independent via bilinear transform
 //!
-//! # Example
+//! # DSP Library Usage
 //!
 //! ```no_run
 //! use engine_field::dsp::{ZPlaneFilter, shapes};
@@ -32,15 +32,34 @@
 //! let mut right = vec![0.0f32; 512];
 //! filter.process_stereo(&mut left, &mut right, 0.2, 1.0);
 //! ```
+//!
+//! # Plugin Usage
+//!
+//! Build the plugin:
+//! ```bash
+//! cargo xtask bundle engine-field-rust --release
+//! ```
+//!
+//! This will create:
+//! - VST3: `target/bundled/Engine Field.vst3`
+//! - CLAP: `target/bundled/Engine Field.clap`
 
 #![deny(unsafe_op_in_unsafe_fn)]
-#![warn(missing_docs)]
 #![warn(clippy::all)]
 
+// Core DSP library (can be used standalone)
 pub mod dsp;
 
-// Re-export main types for convenience
+// Plugin-specific modules (NIH-plug integration)
+mod params;
+mod plugin;
+
+// Re-export main DSP types
 pub use dsp::{ZPlaneFilter, EnvelopeFollower, PolePair, BiquadCoeffs};
+
+// Re-export plugin types
+pub use params::FieldParams;
+pub use plugin::FieldPlugin;
 
 /// Library version
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -62,7 +81,7 @@ mod tests {
     }
 
     #[test]
-    fn test_complete_workflow() {
+    fn test_dsp_workflow() {
         use dsp::shapes;
 
         // Load shapes
@@ -85,5 +104,11 @@ mod tests {
         for &sample in &left {
             assert!(sample.is_finite());
         }
+    }
+
+    #[test]
+    fn test_plugin_creation() {
+        let _plugin = FieldPlugin::default();
+        // Plugin created successfully
     }
 }

@@ -5,10 +5,15 @@ edition = "2021"
 authors = ["Engine:Field Port Team"]
 description = "Rust port of Engine:Field Z-plane filter plugin"
 license = "GPL-3.0-or-later"
+homepage = "https://github.com/1hoookkk/plugin_dev"
+
+# [workspace]
+# members = ["xtask"]
+# NOTE: Temporarily disabled due to network access to crates.io
 
 [lib]
 name = "engine_field"
-crate-type = ["cdylib", "rlib"]
+crate-type = ["cdylib", "lib"]
 
 [dependencies]
 # NIH-plug for plugin framework
@@ -44,6 +49,7 @@ inherits = "release"
 debug = true
 strip = "none"
 
-[[bench]]
-name = "zplane_bench"
-harness = false
+# [[bench]]
+# name = "zplane_bench"
+# harness = false
+# NOTE: Benchmark file not yet created
