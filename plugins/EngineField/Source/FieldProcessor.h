@@ -96,6 +96,9 @@ private:
     juce::UndoManager undo_;
 
     // Cached parameter pointers (avoid repeated atomic lookups in processBlock)
+    // NOTE: These pointers remain valid for the lifetime of the processor because
+    // APVTS owns the parameters and never reallocates/moves them once created.
+    // Using memory_order_relaxed is safe since there are no cross-variable dependencies.
     std::atomic<float>* characterParam_ = nullptr;
     std::atomic<float>* mixParam_ = nullptr;
     std::atomic<float>* gainParam_ = nullptr;
@@ -103,7 +106,9 @@ private:
     std::atomic<float>* effectModeParam_ = nullptr;
     std::atomic<float>* testToneParam_ = nullptr;  // Patch 1: avoid APVTS tree traversal
 
-    // Dry buffer (pre-allocated)
+    // Dry buffer (pre-allocated to avoid RT allocation)
+    // Preallocated to maximum expected block size to avoid allocation in prepareToPlay()
+    static constexpr int MAX_EXPECTED_BLOCK_SIZE = 2048;  // Typical DAW max is 1024-2048
     juce::AudioBuffer<float> dryBuffer_;
 
     // Visualiser ring buffer (mono)
@@ -113,9 +118,6 @@ private:
 
     // UI audio level (envelope follower for pad visualization)
     std::atomic<float> currentLevel { 0.0f };
-    float envelopeAttack = 0.0f;
-    float envelopeRelease = 0.0f;
-    float envelopeState = 0.0f;
     float deltaEnvelopeState = 0.0f; // smoothed delta (wet - dry) for waveform bars
 
     // Waveform visualization circular buffer (60 bars for UI)
@@ -127,7 +129,7 @@ private:
 
     // Lock-free SPSC for waveform peaks (producer: audio thread, consumer: UI thread)
     juce::AbstractFifo uiWaveformFifo_{ kWaveformDepth };
-    std::vector<float> uiWaveformRingBuffer_{};
+    std::vector<float> uiWaveformRingBuffer_;  // Initialized in constructor to kWaveformDepth
 
     // level envelope state (audio thread) and atomic snapshot for UI
     float uiEnvelopeState_ = 0.0f;
